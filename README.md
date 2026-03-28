@@ -1,7 +1,7 @@
 [README (1).md](https://github.com/user-attachments/files/26326496/README.1.md)
 <div align="center">
 
-<img src="https://img.shields.io/badge/🚦_Namma_Predict-Real--Time_Traffic_Intelligence-00d4ff?style=for-the-badge&labelColor=0a0a0f" alt="Namma Predict"/>
+<img src="https://img.shields.io/badge/🚦_Namma_Predict-Real--00d4ff?style=for-the-badge&labelColor=0a0a0f" alt="Namma Predict"/>
 
 <br/>
 <br/>
