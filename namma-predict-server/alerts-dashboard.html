@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Namma Predict — Alerts Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;--border:#1e2d45;
+  --accent:#00d4ff;--accent2:#7c3aed;--green:#10b981;--yellow:#f59e0b;
+  --orange:#f97316;--red:#ef4444;--text:#e2e8f0;--text2:#94a3b8;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* HEADER */
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:12px;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:38px;height:38px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.logo-text h1{font-size:1.1rem;font-weight:800;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-text p{font-size:.72rem;color:var(--text2)}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.live-badge{display:flex;align-items:center;gap:5px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);padding:5px 12px;border-radius:20px;font-size:.72rem;color:var(--green);font-weight:700}
+.live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.75)}}
+.refresh-info{font-size:.72rem;color:var(--text2)}
+.btn-back{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;text-decoration:none;display:flex;align-items:center;gap:5px}
+.btn-back:hover{border-color:var(--accent);color:var(--accent)}
+.btn-clear{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--red);padding:6px 14px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600}
+.btn-clear:hover{background:rgba(239,68,68,.2)}
+
+/* STATS BAR */
+.stats-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--border);border-bottom:1px solid var(--border)}
+.stat-card{background:var(--surface);padding:14px 20px;display:flex;flex-direction:column;gap:3px}
+.stat-label{font-size:.65rem;color:var(--text2);text-transform:uppercase;letter-spacing:.07em}
+.stat-value{font-size:1.6rem;font-weight:800;line-height:1}
+.stat-sub{font-size:.65rem;color:var(--text2)}
+
+/* FILTERS */
+.filters{display:flex;align-items:center;gap:10px;padding:14px 28px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.filter-label{font-size:.75rem;color:var(--text2);font-weight:600;white-space:nowrap}
+.filter-select{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:8px;font-family:inherit;font-size:.8rem;cursor:pointer;outline:none;transition:border-color .2s}
+.filter-select:focus{border-color:var(--accent)}
+.filter-select option{background:var(--surface)}
+.search-box{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:8px;font-family:inherit;font-size:.8rem;outline:none;width:220px;transition:border-color .2s}
+.search-box:focus{border-color:var(--accent)}
+.search-box::placeholder{color:var(--text2)}
+.filter-count{margin-left:auto;font-size:.75rem;color:var(--text2);white-space:nowrap}
+
+/* ALERTS GRID */
+.alerts-container{padding:20px 28px;display:flex;flex-direction:column;gap:10px}
+.no-alerts{text-align:center;padding:60px 20px;color:var(--text2)}
+.no-alerts .icon{font-size:3rem;margin-bottom:12px}
+.no-alerts h3{font-size:1rem;font-weight:600;margin-bottom:6px;color:var(--text)}
+.no-alerts p{font-size:.82rem}
+
+/* ALERT CARD */
+.alert-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;gap:14px;align-items:flex-start;transition:border-color .2s,transform .15s;animation:slideIn .3s ease}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.alert-card:hover{border-color:rgba(0,212,255,.25);transform:translateY(-1px)}
+.alert-sev-bar{width:4px;border-radius:4px;flex-shrink:0;align-self:stretch;min-height:60px}
+.alert-body{flex:1;min-width:0}
+.alert-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.sev-badge{font-size:.65rem;font-weight:800;padding:3px 9px;border-radius:5px;text-transform:uppercase;letter-spacing:.05em}
+.sev-CRITICAL{background:var(--red);color:#fff}
+.sev-HIGH{background:var(--orange);color:#fff}
+.sev-MEDIUM{background:var(--yellow);color:#000}
+.sev-LOW{background:var(--green);color:#fff}
+.alert-location{font-size:.95rem;font-weight:700}
+.alert-type{font-size:.7rem;color:var(--text2);background:var(--surface2);padding:2px 8px;border-radius:4px;border:1px solid var(--border)}
+.alert-city{font-size:.7rem;color:var(--accent);background:rgba(0,212,255,.08);padding:2px 8px;border-radius:4px;border:1px solid rgba(0,212,255,.2)}
+.alert-desc{font-size:.82rem;color:var(--text2);margin-bottom:8px;line-height:1.5}
+.alert-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.alert-meta-item{display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text2)}
+.alert-meta-item strong{color:var(--text)}
+.alert-id{font-size:.65rem;color:var(--text2);font-family:monospace;background:var(--surface2);padding:2px 6px;border-radius:3px}
+.alert-status{display:flex;align-items:center;gap:4px;font-size:.68rem;font-weight:700;color:var(--green)}
+.alert-actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.btn-view{background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);color:var(--accent);padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.7rem;font-weight:600;text-decoration:none;white-space:nowrap}
+.btn-view:hover{background:rgba(0,212,255,.2)}
+
+/* LOADING */
+.loading{display:flex;align-items:center;justify-content:center;padding:60px;gap:12px;color:var(--text2)}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:.82rem;font-weight:600;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:999;animation:toastIn .3s ease;display:none}
+.toast.show{display:block}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+@media(max-width:600px){
+  .header{padding:10px 14px}
+  .filters{padding:10px 14px}
+  .alerts-container{padding:14px}
+  .stats-bar{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">🚨</div>
+    <div class="logo-text">
+      <h1>Alerts Dashboard</h1>
+      <p>Namma Predict — Real-Time Traffic Incidents</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    <span class="refresh-info" id="refresh-info">Refreshing every 5s</span>
+    <a href="http://localhost:3001" class="btn-back">← Back to App</a>
+    <button class="btn-clear" onclick="clearAllAlerts()">🗑 Clear All</button>
+  </div>
+</header>
+
+<div class="stats-bar" id="stats-bar">
+  <div class="stat-card"><div class="stat-label">Total Alerts</div><div class="stat-value" id="s-total" style="color:var(--accent)">—</div><div class="stat-sub">all time</div></div>
+  <div class="stat-card"><div class="stat-label">Critical</div><div class="stat-value" id="s-critical" style="color:var(--red)">—</div><div class="stat-sub">immediate action</div></div>
+  <div class="stat-card"><div class="stat-label">High</div><div class="stat-value" id="s-high" style="color:var(--orange)">—</div><div class="stat-sub">urgent</div></div>
+  <div class="stat-card"><div class="stat-label">Medium</div><div class="stat-value" id="s-medium" style="color:var(--yellow)">—</div><div class="stat-sub">monitor</div></div>
+  <div class="stat-card"><div class="stat-label">Low</div><div class="stat-value" id="s-low" style="color:var(--green)">—</div><div class="stat-sub">informational</div></div>
+  <div class="stat-card"><div class="stat-label">Last Alert</div><div class="stat-value" id="s-last" style="font-size:.9rem;color:var(--text2)">—</div><div class="stat-sub">most recent</div></div>
+</div>
+
+<div class="filters">
+  <span class="filter-label">Filter:</span>
+  <select class="filter-select" id="filter-city" onchange="applyFilters()">
+    <option value="">🌆 All Cities</option>
+    <option value="bengaluru">🌆 Bengaluru</option>
+    <option value="hyderabad">🕌 Hyderabad</option>
+    <option value="delhi">🏛️ Delhi</option>
+    <option value="kalaburagi">🏙️ Kalaburagi</option>
+  </select>
+  <select class="filter-select" id="filter-sev" onchange="applyFilters()">
+    <option value="">⚡ All Severities</option>
+    <option value="CRITICAL">🔴 Critical</option>
+    <option value="HIGH">🟠 High</option>
+    <option value="MEDIUM">🟡 Medium</option>
+    <option value="LOW">🟢 Low</option>
+  </select>
+  <select class="filter-select" id="filter-type" onchange="applyFilters()">
+    <option value="">📋 All Types</option>
+    <option value="collision">💥 Collision</option>
+    <option value="breakdown">🚗 Breakdown</option>
+    <option value="roadwork">🚧 Roadwork</option>
+    <option value="waterlogging">🌊 Waterlogging</option>
+    <option value="signal failure">🚦 Signal Failure</option>
+  </select>
+  <input class="search-box" id="search-box" type="text" placeholder="🔍 Search location, description..." oninput="applyFilters()"/>
+  <span class="filter-count" id="filter-count"></span>
+</div>
+
+<div id="alerts-container" class="alerts-container">
+  <div class="loading"><div class="spinner"></div>Loading alerts...</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var API = 'http://localhost:3001/api';
+var allAlerts = [];
+var refreshInterval = null;
+var lastCount = 0;
+
+var SEV_COLOR = { CRITICAL:'#ef4444', HIGH:'#f97316', MEDIUM:'#f59e0b', LOW:'#10b981' };
+var TYPE_ICON = { collision:'💥', breakdown:'🚗', roadwork:'🚧', waterlogging:'🌊', 'signal failure':'🚦' };
+var CITY_EMOJI = { bengaluru:'🌆', hyderabad:'🕌', delhi:'🏛️', kalaburagi:'🏙️' };
+
+function showToast(msg, color) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.borderColor = color || 'var(--border)';
+  t.style.color = color || 'var(--text)';
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+function timeAgo(iso) {
+  var secs = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return secs + 's ago';
+  if (secs < 3600) return Math.round(secs/60) + 'm ago';
+  if (secs < 86400) return Math.round(secs/3600) + 'h ago';
+  return Math.round(secs/86400) + 'd ago';
+}
+
+function formatTime(iso) {
+  var d = new Date(iso);
+  return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) + ' ' +
+         d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+function fetchAlerts() {
+  fetch(API + '/alerts')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (!data.success) return;
+      var isNew = data.alerts.length > lastCount && lastCount > 0;
+      allAlerts = data.alerts;
+      lastCount = data.alerts.length;
+      updateStats(data.alerts);
+      applyFilters();
+      if (isNew) showToast('🚨 New alert received!', '#ef4444');
+      document.getElementById('refresh-info').textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    })
+    .catch(function(){
+      document.getElementById('refresh-info').textContent = '⚠ Server unreachable';
+    });
+}
+
+function updateStats(alerts) {
+  document.getElementById('s-total').textContent = alerts.length;
+  document.getElementById('s-critical').textContent = alerts.filter(function(a){return a.severity==='CRITICAL'}).length;
+  document.getElementById('s-high').textContent = alerts.filter(function(a){return a.severity==='HIGH'}).length;
+  document.getElementById('s-medium').textContent = alerts.filter(function(a){return a.severity==='MEDIUM'}).length;
+  document.getElementById('s-low').textContent = alerts.filter(function(a){return a.severity==='LOW'}).length;
+  if (alerts.length > 0) {
+    var last = new Date(alerts[0].receivedAt || alerts[0].sentAt || alerts[0].timestamp);
+    document.getElementById('s-last').textContent = timeAgo(last.toISOString());
+  } else {
+    document.getElementById('s-last').textContent = '—';
+  }
+}
+
+function applyFilters() {
+  var city = document.getElementById('filter-city').value;
+  var sev  = document.getElementById('filter-sev').value;
+  var type = document.getElementById('filter-type').value;
+  var q    = document.getElementById('search-box').value.toLowerCase().trim();
+
+  var filtered = allAlerts.filter(function(a){
+    if (city && a.city !== city) return false;
+    if (sev  && a.severity !== sev) return false;
+    if (type && a.type !== type) return false;
+    if (q && !(
+      (a.location||'').toLowerCase().includes(q) ||
+      (a.description||'').toLowerCase().includes(q) ||
+      (a.city||'').toLowerCase().includes(q) ||
+      (a.type||'').toLowerCase().includes(q)
+    )) return false;
+    return true;
+  });
+
+  document.getElementById('filter-count').textContent = filtered.length + ' of ' + allAlerts.length + ' alerts';
+  renderAlerts(filtered);
+}
+
+function renderAlerts(alerts) {
+  var el = document.getElementById('alerts-container');
+  if (!alerts.length) {
+    el.innerHTML = '<div class="no-alerts">' +
+      '<div class="icon">📭</div>' +
+      '<h3>No alerts found</h3>' +
+      '<p>Try changing the filters, or send an alert from the main app.</p>' +
+    '</div>';
+    return;
+  }
+
+  el.innerHTML = alerts.map(function(a, idx){
+    var col = SEV_COLOR[a.severity] || '#64748b';
+    var icon = TYPE_ICON[a.type] || '⚠️';
+    var cityEmoji = CITY_EMOJI[a.city] || '📍';
+    var ts = a.receivedAt || a.sentAt || a.timestamp;
+    var ago = timeAgo(ts);
+    var full = formatTime(ts);
+    var idShort = (a._id || a.id || '').toString().slice(-6);
+
+    return '<div class="alert-card" style="border-left:3px solid ' + col + ';animation-delay:' + (idx*0.04) + 's">' +
+      '<div class="alert-body">' +
+        '<div class="alert-top">' +
+          '<span class="sev-badge sev-' + a.severity + '">' + a.severity + '</span>' +
+          '<span class="alert-location">' + icon + ' ' + (a.location || '—') + '</span>' +
+          '<span class="alert-type">' + (a.type || 'unknown') + '</span>' +
+          '<span class="alert-city">' + cityEmoji + ' ' + (a.city || '—') + '</span>' +
+        '</div>' +
+        '<div class="alert-desc">' + (a.description || 'No description') + '</div>' +
+        '<div class="alert-meta">' +
+          '<div class="alert-meta-item">🕐 <strong>' + ago + '</strong></div>' +
+          '<div class="alert-meta-item">📅 ' + full + '</div>' +
+          (idShort ? '<div class="alert-id">#' + idShort + '</div>' : '') +
+          '<div class="alert-status">✓ Received</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="alert-actions">' +
+        '<a class="btn-view" href="' + API + '/alerts/' + (a._id||a.id) + '" target="_blank">View JSON ↗</a>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function clearAllAlerts() {
+  if (!confirm('Delete ALL alerts from the server? This cannot be undone.')) return;
+  fetch(API + '/alerts', { method: 'DELETE' })
+    .then(function(r){ return r.json(); })
+    .then(function(){
+      allAlerts = [];
+      lastCount = 0;
+      updateStats([]);
+      renderAlerts([]);
+      showToast('✓ All alerts cleared', '#10b981');
+    })
+    .catch(function(){ showToast('⚠ Failed to clear alerts', '#ef4444'); });
+}
+
+// Boot
+fetchAlerts();
+refreshInterval = setInterval(fetchAlerts, 5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "namma-predict",
+  "version": "1.0.0",
+  "description": "Real-Time Traffic Intelligence & Congestion Control — Bengaluru",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve . -p 3000"
+  }
+}

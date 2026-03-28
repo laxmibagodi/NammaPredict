@@ -1,0 +1,1943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Namma Predict — Real-Time Traffic Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;--border:#1e2d45;
+  --accent:#00d4ff;--accent2:#7c3aed;--green:#10b981;--yellow:#f59e0b;
+  --orange:#f97316;--red:#ef4444;--text:#e2e8f0;--text2:#94a3b8;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+#header{display:flex;align-items:center;gap:12px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;min-height:48px}
+#logo{font-size:1.2rem;font-weight:800;color:var(--accent);white-space:nowrap}
+#city-select{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:8px;font-family:inherit;font-size:.82rem;cursor:pointer}
+#tabs{display:flex;gap:2px;flex:1;min-width:0}
+.tab-btn{background:none;border:none;color:var(--text2);padding:7px 12px;border-radius:6px 6px 0 0;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:500;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);background:rgba(0,212,255,.07)}
+.tab-btn:hover:not(.active){color:var(--text);background:rgba(255,255,255,.04)}
+#header-right{display:flex;align-items:center;gap:8px;margin-left:auto}
+#live-badge{background:var(--red);color:#fff;font-size:.68rem;font-weight:700;padding:3px 7px;border-radius:20px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+#clock{font-size:.8rem;color:var(--text2);font-variant-numeric:tabular-nums}
+#export-btn{background:var(--accent2);color:#fff;border:none;padding:5px 12px;border-radius:7px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600}
+#metrics-bar{display:flex;gap:0;background:var(--surface);border-bottom:1px solid var(--border)}
+.metric-card{flex:1;padding:8px 14px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:2px}
+.metric-card:last-child{border-right:none}
+.metric-label{font-size:.65rem;color:var(--text2);text-transform:uppercase;letter-spacing:.07em}
+.metric-value{font-size:1.1rem;font-weight:800}
+.metric-sub{font-size:.65rem;color:var(--text2)}
+.tab-content{display:none;height:calc(100vh - 90px)}
+.tab-content.active{display:flex;flex-direction:column}
+#tab-map{flex-direction:row!important;height:calc(100vh - 90px)}
+#map-left{width:260px;min-width:200px;background:var(--surface);border-right:1px solid var(--border);padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;flex-shrink:0}
+#map-center{flex:1;position:relative;background:#060b14;overflow:hidden}
+#leaflet-base{position:absolute;inset:0;z-index:0}
+#map-canvas{position:absolute;inset:0;z-index:1;display:block;cursor:grab;background:transparent}
+#map-canvas.panning{cursor:grabbing}
+#map-overlay{z-index:2}
+#zoom-controls{z-index:2}
+/* Leaflet dark/satellite overrides */
+.leaflet-container{background:#060b14!important}
+.leaflet-control-zoom{display:none!important}
+.leaflet-control-attribution{background:rgba(10,14,26,.7)!important;color:#64748b!important;font-size:.58rem!important}
+.leaflet-tile-pane{filter:brightness(0.82) saturate(0.75)}
+#map-right{width:270px;min-width:220px;background:var(--surface);border-left:1px solid var(--border);padding:10px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;flex-shrink:0}
+.panel-title{font-size:.72rem;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.route-row{display:flex;flex-direction:column;gap:5px}
+select.route-sel{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 7px;border-radius:6px;font-family:inherit;font-size:.78rem;width:100%}
+#find-route-btn{background:linear-gradient(135deg,#00d4ff,#7c3aed);color:#fff;border:none;padding:7px;border-radius:6px;font-weight:700;cursor:pointer;font-family:inherit;font-size:.8rem;width:100%}
+.road-status-item{display:flex;align-items:center;gap:6px;padding:6px 7px;border-radius:5px;margin-bottom:3px;background:var(--surface2);border:1px solid transparent;cursor:pointer;transition:all .15s}
+.road-status-item:hover{border-color:rgba(0,212,255,.3)}
+.road-status-item.selected{border-color:var(--accent);background:rgba(0,212,255,.1)}
+.alert-card{background:var(--surface2);border-radius:7px;padding:7px 9px;font-size:.75rem;border-left:3px solid var(--orange);margin-bottom:5px;line-height:1.4}
+.alert-card.critical{border-left-color:var(--red)}
+.alert-card.info{border-left-color:var(--accent)}
+#density-canvas{width:100%;height:90px;display:block}
+.pred-card{background:var(--surface2);border-radius:6px;padding:6px 9px;font-size:.75rem;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.signal-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.signal-item{background:var(--surface2);border-radius:6px;padding:6px;font-size:.7rem;text-align:center}
+.signal-light{width:11px;height:11px;border-radius:50%;margin:3px auto 2px;display:block}
+#map-overlay{position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+#map-legend{background:rgba(17,24,39,.92);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:.72rem;pointer-events:auto}
+#layer-toggles{background:rgba(17,24,39,.92);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:.72rem;pointer-events:auto;display:flex;flex-direction:column;gap:4px}
+.toggle-row{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.toggle-cb{width:13px;height:13px;accent-color:var(--accent);cursor:pointer}
+#zoom-controls{position:absolute;bottom:14px;right:14px;display:flex;flex-direction:column;gap:4px}
+.zoom-btn{background:var(--surface);border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:.9rem;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.zoom-btn:hover{background:var(--surface2)}
+#tab-accidents{padding:16px;overflow-y:auto;gap:12px}
+.acc-header{display:flex;align-items:center;gap:10px}
+.acc-header h2{font-size:1rem;font-weight:700}
+.live-pulse{background:var(--red);color:#fff;font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:20px;animation:pulse 1s infinite}
+#accidents-list{display:flex;flex-direction:column;gap:9px}
+.acc-card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:7px}
+.acc-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.sev-badge{font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase}
+.sev-CRITICAL{background:var(--red);color:#fff}.sev-HIGH{background:var(--orange);color:#fff}
+.sev-MEDIUM{background:var(--yellow);color:#000}.sev-LOW{background:var(--green);color:#fff}
+.acc-loc{font-weight:600;font-size:.88rem}
+.acc-type{font-size:.72rem;color:var(--text2);background:var(--surface2);padding:2px 7px;border-radius:4px}
+.acc-desc{font-size:.8rem;color:var(--text2)}
+.acc-bottom{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px}
+.acc-time{font-size:.72rem;color:var(--text2)}
+.send-alert-btn{background:var(--accent2);color:#fff;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600}
+.alert-status{font-size:.75rem;font-weight:600;color:var(--green)}
+.server-box{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:14px;display:flex;flex-direction:column;gap:7px}
+.endpoint-row{display:flex;align-items:center;gap:7px;font-size:.78rem;font-family:monospace}
+.method-badge{font-size:.65rem;font-weight:700;padding:2px 5px;border-radius:4px}
+.method-POST{background:var(--orange);color:#fff}.method-GET{background:var(--green);color:#fff}
+.copy-url-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.75rem}
+#tab-parking{padding:16px;overflow-y:auto;gap:14px}
+#parking-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.park-card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:7px}
+.park-name{font-weight:700;font-size:.9rem}
+.park-stats{display:flex;gap:10px;font-size:.75rem;color:var(--text2)}
+.occ-bar-bg{background:var(--surface2);border-radius:4px;height:5px;overflow:hidden}
+.occ-bar-fill{height:100%;border-radius:4px;transition:width .5s}
+.park-meta{display:flex;justify-content:space-between;font-size:.72rem;color:var(--text2)}
+.park-status{font-size:.67rem;font-weight:700;padding:2px 7px;border-radius:4px}
+.park-OPEN{background:var(--green);color:#fff}.park-FULL{background:var(--red);color:#fff}.park-CLOSING{background:var(--yellow);color:#000}
+.reserve-btn{background:var(--accent);color:#000;border:none;padding:6px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:700;width:100%}
+.reserve-btn.reserved{background:var(--green);color:#fff;cursor:default}
+#tab-analytics{padding:16px;overflow-y:auto;gap:14px}
+.stat-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:14px}
+.stat-label{font-size:.68rem;color:var(--text2);text-transform:uppercase;letter-spacing:.06em}
+.stat-value{font-size:1.7rem;font-weight:800;color:var(--accent);margin:3px 0}
+.stat-sub{font-size:.72rem;color:var(--text2)}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chart-box{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px}
+.chart-box canvas{width:100%!important;display:block}
+.chart-title{font-size:.75rem;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+.cong-table{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th{text-align:left;color:var(--text2);font-weight:600;padding:5px 7px;border-bottom:1px solid var(--border)}
+td{padding:5px 7px;border-bottom:1px solid rgba(30,45,69,.5)}
+.trend-up{color:var(--red)}.trend-dn{color:var(--green)}
+#tab-reroute{padding:16px;overflow-y:auto;gap:14px}
+.reroute-header{font-size:1rem;font-weight:700}
+.reroute-controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.reroute-controls select{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-family:inherit;font-size:.82rem}
+#calc-routes-btn{background:var(--accent);color:#000;border:none;padding:7px 18px;border-radius:7px;font-weight:700;cursor:pointer;font-family:inherit;font-size:.82rem}
+.routes-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.route-card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.route-label{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
+.route-name{font-size:.9rem;font-weight:700}
+.route-meta{display:flex;gap:8px;font-size:.75rem;flex-wrap:wrap}
+.cong-score{font-size:.67rem;font-weight:700;padding:2px 7px;border-radius:4px}
+.cong-LOW{background:var(--green);color:#fff}.cong-MEDIUM{background:var(--yellow);color:#000}
+.cong-HIGH{background:var(--orange);color:#fff}.cong-CRITICAL{background:var(--red);color:#fff}
+.route-steps{display:flex;flex-direction:column;gap:3px;max-height:180px;overflow-y:auto}
+.route-step{display:flex;align-items:center;justify-content:space-between;font-size:.72rem;padding:3px 0;border-bottom:1px solid rgba(30,45,69,.5)}
+.road-pill{font-size:.62rem;padding:1px 5px;border-radius:3px;font-weight:600}
+.activate-btn{background:var(--accent2);color:#fff;border:none;padding:6px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600;width:100%}
+.activate-btn.activated{background:var(--green);cursor:default}
+.advisories-box{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px}
+.advisory-item{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid rgba(30,45,69,.5);font-size:.78rem}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:3px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:900px){
+  #tab-map{flex-direction:column!important}
+  #map-left,#map-right{width:100%;border:none;border-bottom:1px solid var(--border)}
+  #map-center{height:320px}
+  .routes-row{grid-template-columns:1fr}
+  .charts-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div id="logo">🚦 Namma Predict</div>
+  <select id="city-select">
+    <option value="bengaluru">Bengaluru</option>
+    <option value="hyderabad">Hyderabad</option>
+    <option value="delhi">Delhi</option>
+    <option value="kalaburagi">Kalaburagi</option>
+  </select>
+  <div id="tabs">
+    <button class="tab-btn active" data-tab="map">🗺 Map</button>
+    <button class="tab-btn" data-tab="accidents">🚨 Accidents</button>
+    <button class="tab-btn" data-tab="parking">🅿 Parking</button>
+    <button class="tab-btn" data-tab="analytics">📊 Analytics</button>
+    <button class="tab-btn" data-tab="reroute">🔀 Reroute</button>
+  </div>
+  <div id="header-right">
+    <span id="traffic-mode-badge" style="font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:20px;border:1px solid rgba(100,116,139,.3);color:#94a3b8;background:rgba(100,116,139,.12);cursor:default" title="Click to configure TomTom API key">⚙ SIMULATED</span>
+    <span id="live-badge">● LIVE</span>
+    <span id="clock">--:--:--</span>
+    <button id="export-btn">⬇ Export</button>
+  </div>
+</div>
+<div id="metrics-bar">
+  <div class="metric-card"><div class="metric-label">Avg Speed</div><div class="metric-value" id="m-speed">--</div><div class="metric-sub">km/h</div></div>
+  <div class="metric-card"><div class="metric-label">Traffic Density</div><div class="metric-value" id="m-density">--</div><div class="metric-sub">network avg</div></div>
+  <div class="metric-card"><div class="metric-label">Congested Roads</div><div class="metric-value" id="m-cong">--</div><div class="metric-sub">high + severe</div></div>
+  <div class="metric-card"><div class="metric-label">Active Incidents</div><div class="metric-value" id="m-inc">--</div><div class="metric-sub">detected</div></div>
+</div>
+
+<div id="tab-map" class="tab-content active">
+  <div id="map-left">
+    <div>
+      <div class="panel-title">Route Planner</div>
+      <div class="route-row">
+        <select class="route-sel" id="route-from"></select>
+        <select class="route-sel" id="route-to"></select>
+        <button id="find-route-btn">🔍 Find Optimal Route</button>
+      </div>
+      <div id="route-result-panel" style="margin-top:7px"></div>
+    </div>
+    <div>
+      <div class="panel-title">Road Status</div>
+      <div id="road-status-list"></div>
+    </div>
+  </div>
+  <div id="map-center">
+    <div id="leaflet-base"></div>
+    <canvas id="map-canvas"></canvas>
+    <div id="map-overlay">
+      <div id="map-legend">
+        <div style="font-size:.72rem;font-weight:700;color:var(--accent);margin-bottom:5px">Congestion</div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:#10b981;display:inline-block"></span><span>Low</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:#f59e0b;display:inline-block"></span><span>Medium</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:#f97316;display:inline-block"></span><span>High</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:50%;background:#ef4444;display:inline-block"></span><span>Severe</span></div>
+        </div>
+      </div>
+      <div id="layer-toggles">
+        <div style="font-size:.7rem;font-weight:700;color:var(--accent);margin-bottom:4px">Map Style</div>
+        <select id="map-style-select" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 7px;border-radius:5px;font-family:inherit;font-size:.72rem;width:100%;margin-bottom:6px;cursor:pointer">
+          <option value="street">🗺 Street</option>
+          <option value="dark">🌑 Dark</option>
+          <option value="satellite">🛰 Satellite</option>
+        </select>
+        <label class="toggle-row"><input type="checkbox" class="toggle-cb" id="tog-heatmap" checked> Heatmap</label>
+        <label class="toggle-row"><input type="checkbox" class="toggle-cb" id="tog-signals" checked> Signals</label>
+      </div>
+    </div>
+    <div id="zoom-controls">
+      <button class="zoom-btn" id="zoom-in" title="Zoom In">+</button>
+      <button class="zoom-btn" id="zoom-out" title="Zoom Out">−</button>
+      <button class="zoom-btn" id="zoom-reset" title="Reset">⊙</button>
+    </div>
+  </div>
+  <div id="map-right">
+    <div>
+      <div class="panel-title">Control Alerts</div>
+      <div id="control-alerts"></div>
+    </div>
+    <div>
+      <div class="panel-title">Density Trend</div>
+      <canvas id="density-canvas"></canvas>
+    </div>
+    <div>
+      <div class="panel-title">30-Min Prediction</div>
+      <div id="pred-cards"></div>
+    </div>
+    <div>
+      <div class="panel-title">Signal Control</div>
+      <div class="signal-grid" id="signal-grid"></div>
+      <div style="font-size:.67rem;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-top:9px;margin-bottom:4px">Recent Actions</div>
+      <div id="signal-log" style="display:flex;flex-direction:column;gap:3px;max-height:120px;overflow-y:auto"></div>
+    </div>
+    <div>
+      <div class="panel-title">Incidents</div>
+      <div id="incidents-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="tab-accidents" class="tab-content">
+  <div class="acc-header">
+    <h2>Live Accident Detection</h2>
+    <span class="live-pulse">● LIVE</span>
+  </div>
+  <div id="accidents-list"></div>
+  <div class="server-box">
+    <div class="panel-title">Server Endpoint <span style="color:var(--green);font-size:.65rem;margin-left:6px">● RUNNING on :3001</span></div>
+    <div class="endpoint-row"><span class="method-badge method-POST">POST</span><span id="server-url">http://localhost:3001/api/alerts</span></div>
+    <div class="endpoint-row"><span class="method-badge method-GET">GET</span><span>http://localhost:3001/api/alerts</span></div>
+    <div style="display:flex;gap:6px;margin-top:4px">
+      <button class="copy-url-btn" id="copy-url-btn">Copy URL</button>
+      <a href="http://localhost:3001/alerts" target="_blank" style="background:var(--accent);color:#000;border:none;padding:4px 10px;border-radius:6px;font-size:.75rem;font-weight:700;text-decoration:none;display:flex;align-items:center">Open Alerts Dashboard ↗</a>
+    </div>
+  </div>
+  <div style="margin-top:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div class="panel-title" style="margin-bottom:0">Sent Alerts Log</div>
+      <button onclick="clearAlertLog()" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:var(--red);padding:3px 9px;border-radius:5px;cursor:pointer;font-size:.7rem">Clear</button>
+    </div>
+    <div id="alert-log-list" style="display:flex;flex-direction:column;gap:7px"></div>
+  </div>
+</div>
+
+<div id="tab-parking" class="tab-content">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px">
+    <h2 style="font-size:1rem;font-weight:700">Parking Zones</h2>
+    <span style="font-size:.75rem;color:var(--text2)">Updates every 5s</span>
+  </div>
+  <div id="parking-grid"></div>
+</div>
+
+<div id="tab-analytics" class="tab-content">
+  <h2 style="font-size:1rem;font-weight:700">Analytics Dashboard</h2>
+  <div class="stat-cards" id="stat-cards"></div>
+  <div class="charts-row">
+    <div class="chart-box"><div class="chart-title">Speed Distribution</div><canvas id="speed-dist-canvas" height="150"></canvas></div>
+    <div class="chart-box"><div class="chart-title">Congestion by Hour</div><canvas id="cong-hour-canvas" height="150"></canvas></div>
+  </div>
+  <div class="cong-table"><div class="chart-title">Top 5 Most Congested Roads</div><table id="cong-table"></table></div>
+  <div class="cong-table"><div class="chart-title">City Comparison</div><table id="city-compare-table"></table></div>
+</div>
+
+<div id="tab-reroute" class="tab-content">
+  <div class="reroute-header">Smart Reroute Engine</div>
+  <div class="reroute-controls">
+    <select id="rr-from"></select>
+    <span style="color:var(--text2)">→</span>
+    <select id="rr-to"></select>
+    <button id="calc-routes-btn">Calculate Routes</button>
+  </div>
+  <div class="routes-row" id="routes-row"></div>
+  <div class="advisories-box">
+    <div class="chart-title">Active Reroute Advisories</div>
+    <div id="advisories-list"></div>
+  </div>
+</div>
+
+<script>
+
+// ===================== CITY DATA =====================
+var CITIES = {
+  bengaluru: {
+    name: 'Bengaluru',
+    nodes: [
+      {id:'MG',label:'MG Road',lat:12.9756,lng:77.6097},
+      {id:'SB',label:'Silk Board',lat:12.9177,lng:77.6228},
+      {id:'KR',label:'Koramangala',lat:12.9352,lng:77.6245},
+      {id:'IN',label:'Indiranagar',lat:12.9784,lng:77.6408},
+      {id:'WH',label:'Whitefield',lat:12.9698,lng:77.7499},
+      {id:'EL',label:'Electronic City',lat:12.8399,lng:77.6770},
+      {id:'JP',label:'Jayanagar',lat:12.9308,lng:77.5838},
+      {id:'MR',label:'Marathahalli',lat:12.9591,lng:77.6974},
+      {id:'YE',label:'Yeshwanthpur',lat:13.0275,lng:77.5540},
+      {id:'HB',label:'Hebbal',lat:13.0358,lng:77.5970},
+      {id:'BN',label:'Bannerghatta',lat:12.8636,lng:77.5975},
+      {id:'KP',label:'Kempegowda',lat:12.9767,lng:77.5713}
+    ],
+    edges:[
+      {from:'MG',to:'IN',name:'100 Feet Rd'},
+      {from:'MG',to:'KR',name:'Hosur Rd'},
+      {from:'KR',to:'SB',name:'Outer Ring Rd'},
+      {from:'SB',to:'EL',name:'Hosur Main Rd'},
+      {from:'IN',to:'MR',name:'Old Airport Rd'},
+      {from:'MR',to:'WH',name:'Whitefield Main Rd'},
+      {from:'KP',to:'MG',name:'MG Road'},
+      {from:'KP',to:'YE',name:'Tumkur Rd'},
+      {from:'YE',to:'HB',name:'Bellary Rd'},
+      {from:'HB',to:'IN',name:'Hennur Rd'},
+      {from:'JP',to:'KR',name:'Bannerghatta Rd'},
+      {from:'JP',to:'BN',name:'Kanakapura Rd'},
+      {from:'BN',to:'EL',name:'Bannerghatta Main Rd'},
+      {from:'KR',to:'MR',name:'Sarjapur Rd'},
+      {from:'SB',to:'JP',name:'BTM Layout Rd'}
+    ],
+    incidents:[
+      {node:'SB',type:'congestion',desc:'Heavy traffic near flyover'},
+      {node:'MR',type:'accident',desc:'Minor collision reported'},
+      {node:'WH',type:'roadwork',desc:'Road widening in progress'}
+    ],
+    signals:['MG Road','Silk Board','Koramangala','Indiranagar','Marathahalli','Whitefield']
+  },
+  hyderabad: {
+    name: 'Hyderabad',
+    nodes: [
+      {id:'CH',label:'Charminar',lat:17.3616,lng:78.4747},
+      {id:'HT',label:'Hi-Tech City',lat:17.4435,lng:78.3772},
+      {id:'BJ',label:'Banjara Hills',lat:17.4156,lng:78.4347},
+      {id:'SR',label:'Secunderabad',lat:17.4399,lng:78.4983},
+      {id:'KP',label:'Kukatpally',lat:17.4849,lng:78.3996},
+      {id:'LB',label:'LB Nagar',lat:17.3469,lng:78.5524},
+      {id:'AM',label:'Ameerpet',lat:17.4374,lng:78.4487},
+      {id:'GC',label:'Gachibowli',lat:17.4401,lng:78.3489},
+      {id:'UP',label:'Uppal',lat:17.4059,lng:78.5592},
+      {id:'MD',label:'Madhapur',lat:17.4486,lng:78.3908}
+    ],
+    edges:[
+      {from:'CH',to:'LB',name:'Charminar Rd'},
+      {from:'CH',to:'BJ',name:'Necklace Rd'},
+      {from:'BJ',to:'AM',name:'Road No 12'},
+      {from:'AM',to:'SR',name:'SP Rd'},
+      {from:'AM',to:'HT',name:'Jubilee Hills Rd'},
+      {from:'HT',to:'GC',name:'Outer Ring Rd'},
+      {from:'HT',to:'MD',name:'Hi-Tech City Rd'},
+      {from:'MD',to:'KP',name:'JNTU Rd'},
+      {from:'KP',to:'SR',name:'NH65'},
+      {from:'SR',to:'UP',name:'Uppal Rd'},
+      {from:'UP',to:'LB',name:'LB Nagar Rd'},
+      {from:'GC',to:'MD',name:'Gachibowli Rd'}
+    ],
+    incidents:[
+      {node:'HT',type:'congestion',desc:'IT corridor peak hour jam'},
+      {node:'SR',type:'roadwork',desc:'Metro construction ongoing'}
+    ],
+    signals:['Charminar','Hi-Tech City','Banjara Hills','Ameerpet','Kukatpally','Gachibowli']
+  },
+  delhi: {
+    name: 'Delhi',
+    nodes: [
+      {id:'CP',label:'Connaught Pl',lat:28.6315,lng:77.2167},
+      {id:'DW',label:'Dwarka',lat:28.5921,lng:77.0460},
+      {id:'NW',label:'Noida',lat:28.5355,lng:77.3910},
+      {id:'GG',label:'Gurgaon',lat:28.4595,lng:77.0266},
+      {id:'RK',label:'Rohini',lat:28.7495,lng:77.0674},
+      {id:'LJ',label:'Lajpat Nagar',lat:28.5677,lng:77.2433},
+      {id:'JN',label:'Janakpuri',lat:28.6219,lng:77.0840},
+      {id:'KS',label:'Kashmere Gate',lat:28.6671,lng:77.2285},
+      {id:'SJ',label:'Sarojini Nagar',lat:28.5755,lng:77.1921},
+      {id:'VK',label:'Vikaspuri',lat:28.6413,lng:77.0706}
+    ],
+    edges:[
+      {from:'CP',to:'KS',name:'Ring Rd'},
+      {from:'CP',to:'LJ',name:'Mathura Rd'},
+      {from:'CP',to:'SJ',name:'Janpath'},
+      {from:'SJ',to:'DW',name:'NH48'},
+      {from:'DW',to:'JN',name:'Dwarka Expressway'},
+      {from:'JN',to:'VK',name:'Najafgarh Rd'},
+      {from:'VK',to:'RK',name:'Outer Ring Rd'},
+      {from:'RK',to:'KS',name:'GT Karnal Rd'},
+      {from:'LJ',to:'NW',name:'DND Flyway'},
+      {from:'NW',to:'KS',name:'NH24'},
+      {from:'GG',to:'DW',name:'NH48'},
+      {from:'GG',to:'SJ',name:'MG Rd Gurgaon'}
+    ],
+    incidents:[
+      {node:'CP',type:'congestion',desc:'Heavy traffic at roundabout'},
+      {node:'NW',type:'accident',desc:'Multi-vehicle accident on DND'}
+    ],
+    signals:['Connaught Pl','Dwarka','Noida','Gurgaon','Rohini','Lajpat Nagar']
+  },
+  kalaburagi: {
+    name: 'Kalaburagi',
+    nodes: [
+      {id:'SC', label:'Super Market',      lat:17.3297, lng:76.8200},
+      {id:'BS', label:'Bus Stand',         lat:17.3310, lng:76.8175},
+      {id:'RY', label:'Railway Station',   lat:17.3250, lng:76.8100},
+      {id:'MH', label:'Medical College',   lat:17.3380, lng:76.8250},
+      {id:'SH', label:'Shahapur Cross',    lat:17.3200, lng:76.8300},
+      {id:'AF', label:'Aland Fata',        lat:17.3450, lng:76.8050},
+      {id:'GD', label:'Gulbarga Dist',     lat:17.3150, lng:76.8150},
+      {id:'KT', label:'Kalaburagi Town',   lat:17.3320, lng:76.8220},
+      {id:'SU', label:'Sharnbasva Univ',   lat:17.3748, lng:76.8194},
+      {id:'SB', label:'SB College',        lat:17.3289, lng:76.8198},
+      {id:'VN', label:'Vidyanagar',        lat:17.3412, lng:76.8321},
+      {id:'VT', label:'VTU College',       lat:17.3312, lng:76.8215},
+      {id:'KP', label:'Kharge Petrol Pump',lat:17.3305, lng:76.8210},
+      {id:'JC', label:'Jagat Circle',      lat:17.3358, lng:76.8265},
+      {id:'TC', label:'Timmapuri Circle',  lat:17.3180, lng:76.8240},
+      {id:'HR', label:'Humnabad Ring Rd',  lat:17.3090, lng:76.8310},
+      {id:'DG', label:'Darga',             lat:17.3340, lng:76.8420}
+    ],
+    edges:[
+      {from:'SC', to:'BS',  name:'Main Rd'},
+      {from:'BS', to:'RY',  name:'Station Rd'},
+      {from:'RY', to:'GD',  name:'NH150'},
+      {from:'SC', to:'MH',  name:'College Rd'},
+      {from:'MH', to:'AF',  name:'Aland Rd'},
+      {from:'BS', to:'KT',  name:'Market Rd'},
+      {from:'KT', to:'SH',  name:'Shahapur Rd'},
+      {from:'SH', to:'GD',  name:'Ring Rd'},
+      {from:'AF', to:'KT',  name:'Bypass Rd'},
+      {from:'AF', to:'SU',  name:'Sedam Rd'},
+      {from:'MH', to:'SU',  name:'University Rd'},
+      {from:'SC', to:'SB',  name:'SB College Rd'},
+      {from:'SB', to:'BS',  name:'Station Link Rd'},
+      {from:'MH', to:'VN',  name:'Vidyanagar Rd'},
+      {from:'VN', to:'KT',  name:'Vidyanagar Main Rd'},
+      {from:'VN', to:'SH',  name:'East Ring Rd'},
+      {from:'SC', to:'KP',  name:'Super Market Rd'},
+      {from:'KP', to:'VT',  name:'VTU Rd'},
+      {from:'KP', to:'JC',  name:'Jagat Circle Rd'},
+      {from:'JC', to:'MH',  name:'Medical Rd'},
+      {from:'JC', to:'DG',  name:'Darga Rd'},
+      {from:'JC', to:'VN',  name:'Vidyanagar Link'},
+      {from:'KT', to:'TC',  name:'Timmapuri Rd'},
+      {from:'TC', to:'HR',  name:'Humnabad Ring Rd'},
+      {from:'TC', to:'GD',  name:'South Link Rd'},
+      {from:'HR', to:'SH',  name:'Ring Rd South'},
+      {from:'DG', to:'KT',  name:'Old City Rd'},
+      {from:'DG', to:'BS',  name:'Darga-Bus Stand Rd'}
+    ],
+    incidents:[
+      {node:'BS', type:'congestion', desc:'Severe congestion — KKCCI flagged unregulated hawkers & no parking complex near Bus Stand'},
+      {node:'RY', type:'roadwork',   desc:'NH150 repair work ongoing near Railway Station — delayed completion'},
+      {node:'SU', type:'congestion', desc:'Student rush hour congestion near Sharnbasva University'},
+      {node:'SB', type:'congestion', desc:'Peak hour traffic near SB College — narrow road, no signal'},
+      {node:'JC', type:'congestion', desc:'Jagat Circle bottleneck — high vehicle volume from multiple roads merging'},
+      {node:'DG', type:'congestion', desc:'Pilgrim rush near Khwaja Bande Nawaz Dargah — major Sufi pilgrimage site'},
+      {node:'AF', type:'roadwork',   desc:'Afzalpur taluk road damage — Bhima River flooding affected road surface'}
+    ],
+    signals:[
+      'Super Market', 'Bus Stand', 'Railway Station', 'Medical College',
+      'Jagat Circle', 'Timmapuri Circle', 'VTU College', 'Darga',
+      'Sharnbasva Univ', 'Vidyanagar'
+    ]
+  }
+};
+
+// ===================== PARKING DATA =====================
+var PARKING_DATA = {
+  bengaluru:[
+    {name:'MG Road Multilevel',total:400,price:40,dist:'0.2 km'},
+    {name:'Silk Board P&R',total:600,price:20,dist:'8.1 km'},
+    {name:'Koramangala Complex',total:250,price:35,dist:'4.2 km'},
+    {name:'Indiranagar Metro',total:180,price:30,dist:'3.8 km'},
+    {name:'Whitefield IT Park',total:800,price:25,dist:'18 km'},
+    {name:'Electronic City Hub',total:500,price:15,dist:'20 km'},
+    {name:'Jayanagar 4th Block',total:120,price:20,dist:'5.5 km'},
+    {name:'Yeshwanthpur Depot',total:300,price:10,dist:'9 km'}
+  ],
+  hyderabad:[
+    {name:'Charminar Heritage P',total:200,price:30,dist:'0.5 km'},
+    {name:'Hi-Tech City Tower',total:700,price:50,dist:'12 km'},
+    {name:'Banjara Hills Mall',total:350,price:45,dist:'6 km'},
+    {name:'Secunderabad Stn',total:400,price:20,dist:'7 km'},
+    {name:'Kukatpally Metro',total:250,price:25,dist:'14 km'},
+    {name:'Gachibowli Stadium',total:600,price:30,dist:'13 km'},
+    {name:'Ameerpet Junction',total:150,price:35,dist:'5 km'},
+    {name:'Madhapur Cyber Hub',total:500,price:40,dist:'11 km'}
+  ],
+  delhi:[
+    {name:'Connaught Place UG',total:500,price:60,dist:'0.1 km'},
+    {name:'Dwarka Sector 10',total:400,price:30,dist:'15 km'},
+    {name:'Noida Sector 18',total:600,price:40,dist:'18 km'},
+    {name:'Gurgaon Cyber City',total:800,price:55,dist:'28 km'},
+    {name:'Rohini West Metro',total:300,price:20,dist:'22 km'},
+    {name:'Lajpat Nagar Mkt',total:200,price:35,dist:'8 km'},
+    {name:'Kashmere Gate ISBT',total:350,price:15,dist:'5 km'},
+    {name:'Sarojini Nagar Mkt',total:180,price:25,dist:'4 km'}
+  ],
+  kalaburagi:[
+    {name:'Super Market Lot',      total:100, price:10, dist:'0.1 km'},
+    {name:'Bus Stand Parking',     total:150, price:5,  dist:'0.3 km'},
+    {name:'Railway Stn Lot',       total:80,  price:5,  dist:'1 km'},
+    {name:'Medical College P',     total:120, price:10, dist:'1.5 km'},
+    {name:'Shahapur Cross Lot',    total:60,  price:5,  dist:'2 km'},
+    {name:'Aland Rd Parking',      total:80,  price:5,  dist:'3 km'},
+    {name:'Town Hall Parking',     total:100, price:10, dist:'0.5 km'},
+    {name:'District Court Lot',    total:90,  price:5,  dist:'0.8 km'},
+    {name:'Sharnbasva Univ P',     total:300, price:10, dist:'4.5 km'},
+    {name:'SB College Parking',    total:150, price:5,  dist:'0.2 km'},
+    {name:'Vidyanagar Complex',    total:120, price:10, dist:'1.8 km'},
+    {name:'VTU College Parking',   total:200, price:10, dist:'0.3 km'},
+    {name:'Jagat Circle Lot',      total:80,  price:10, dist:'0.9 km'},
+    {name:'Darga Parking',         total:250, price:5,  dist:'1.1 km'}
+  ]
+};
+
+// ===================== STATE =====================
+var currentCity = 'bengaluru';
+var congestion = {};
+var densityHistory = [];
+var accidents = [];
+var parkingState = {};
+var activeAdvisories = [];
+var highlightedPath = null;
+var selectedRoadKey = null;
+var signalActionLog = [];
+
+// Canvas map state
+var mapCanvas, mapCtx;
+var mapZoom = 1.0;
+var mapPanX = 0, mapPanY = 0;
+var mapIsPanning = false;
+var mapPanStartX = 0, mapPanStartY = 0;
+var mapPanStartPX = 0, mapPanStartPY = 0;
+var mapProjection = null; // {minLat,maxLat,minLng,maxLng,scaleX,scaleY,padX,padY}
+var flowDots = [];
+var animFrameId = null;
+var showHeatmap = true;
+var showSignals = true;
+
+// ===================== REAL-TIME TRAFFIC (TomTom via server proxy) =========
+var trafficMode = 'simulated'; // 'live' | 'simulated'
+var lastLiveFetch = 0;
+var LIVE_FETCH_INTERVAL = 30000; // TomTom free tier: 2500 req/day → fetch every 30s
+
+// Build midpoint list for all edges (used to query TomTom flow)
+function buildEdgeMidpoints() {
+  var city = CITIES[currentCity];
+  return city.edges.map(function(edge) {
+    var fn = city.nodes.find(function(n) { return n.id === edge.from; });
+    var tn = city.nodes.find(function(n) { return n.id === edge.to; });
+    if (!fn || !tn) return null;
+    return {
+      id: edge.from + '-' + edge.to,
+      lat: ((fn.lat + tn.lat) / 2).toFixed(6),
+      lng: ((fn.lng + tn.lng) / 2).toFixed(6)
+    };
+  }).filter(Boolean);
+}
+
+function fetchLiveTraffic() {
+  var now = Date.now();
+  if (now - lastLiveFetch < LIVE_FETCH_INTERVAL) return;
+  lastLiveFetch = now;
+
+  var points = buildEdgeMidpoints();
+  fetch('http://localhost:3001/api/traffic/batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ points: points })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(resp) {
+    if (!resp.success) {
+      // API key not set — stay in simulated mode
+      updateTrafficModeUI('simulated');
+      return;
+    }
+    var city = CITIES[currentCity];
+    var gotLive = false;
+    Object.keys(resp.data).forEach(function(edgeKey) {
+      var d = resp.data[edgeKey];
+      if (d.congestion === null || d.error) return;
+      // Map edge congestion back to both endpoint nodes
+      var parts = edgeKey.split('-');
+      var fromId = parts[0], toId = parts[1];
+      // Blend: 70% live, 30% current simulated (smoothing)
+      if (congestion[fromId] !== undefined) {
+        congestion[fromId] = Math.round((d.congestion * 0.7 + congestion[fromId] * 0.3) * 100) / 100;
+      }
+      if (congestion[toId] !== undefined) {
+        congestion[toId] = Math.round((d.congestion * 0.7 + congestion[toId] * 0.3) * 100) / 100;
+      }
+      gotLive = true;
+    });
+    trafficMode = gotLive ? 'live' : 'simulated';
+    updateTrafficModeUI(trafficMode);
+  })
+  .catch(function() {
+    updateTrafficModeUI('simulated');
+  });
+}
+
+// Fetch real incidents from TomTom and inject into city incidents
+function fetchLiveIncidents() {
+  var city = CITIES[currentCity];
+  var lats = city.nodes.map(function(n) { return n.lat; });
+  var lngs = city.nodes.map(function(n) { return n.lng; });
+  var bbox = [
+    Math.min.apply(null, lngs) - 0.05,
+    Math.min.apply(null, lats) - 0.05,
+    Math.max.apply(null, lngs) + 0.05,
+    Math.max.apply(null, lats) + 0.05
+  ].join(',');
+
+  fetch('http://localhost:3001/api/traffic/incidents?bbox=' + bbox)
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.incidents || !data.incidents.length) return;
+    // Map TomTom incident categories to our types
+    var catMap = { 1:'accident', 2:'accident', 3:'roadwork', 4:'roadwork', 5:'congestion', 6:'congestion', 7:'waterlogging', 8:'roadwork', 9:'accident', 10:'roadwork', 11:'congestion' };
+    var sevMap = { 0:'LOW', 1:'LOW', 2:'MEDIUM', 3:'HIGH', 4:'CRITICAL' };
+    data.incidents.slice(0, 5).forEach(function(inc) {
+      var props = inc.properties || {};
+      var type = catMap[props.iconCategory] || 'congestion';
+      var sev = sevMap[props.magnitudeOfDelay] || 'MEDIUM';
+      var desc = (props.events && props.events[0] && props.events[0].description) || 'Traffic incident reported';
+      var from = props.from || 'Unknown location';
+      // Auto-generate accident card
+      accidents.unshift({
+        id: Date.now() + Math.random(),
+        sev: sev,
+        loc: from,
+        type: type,
+        desc: desc,
+        time: new Date(props.startTime || Date.now()),
+        sent: false,
+        sending: false,
+        live: true  // flag as real data
+      });
+    });
+    if (accidents.length > 15) accidents = accidents.slice(0, 15);
+    renderAccidents();
+    renderIncidents();
+  })
+  .catch(function() { /* silently ignore — server may not have key */ });
+}
+
+function updateTrafficModeUI(mode) {
+  var el = document.getElementById('traffic-mode-badge');
+  if (!el) return;
+  if (mode === 'live') {
+    el.textContent = '🛰 LIVE DATA';
+    el.style.background = 'rgba(16,185,129,.15)';
+    el.style.borderColor = 'rgba(16,185,129,.4)';
+    el.style.color = '#10b981';
+  } else {
+    el.textContent = '⚙ SIMULATED';
+    el.style.background = 'rgba(100,116,139,.12)';
+    el.style.borderColor = 'rgba(100,116,139,.3)';
+    el.style.color = '#94a3b8';
+  }
+}
+
+// ===================== CONGESTION (hybrid: live + simulation) ==============
+function initCongestion() {
+  congestion = {};
+  trafficMode = 'simulated';
+  lastLiveFetch = 0;
+  var city = CITIES[currentCity];
+  city.nodes.forEach(function(n) {
+    congestion[n.id] = Math.random() * 0.7 + 0.1;
+  });
+  // Kick off first live fetch immediately
+  fetchLiveTraffic();
+  fetchLiveIncidents();
+}
+
+function tickCongestion() {
+  var city = CITIES[currentCity];
+  // Always apply small simulation drift for smooth animation
+  city.nodes.forEach(function(n) {
+    var delta = (Math.random() - 0.48) * (trafficMode === 'live' ? 0.03 : 0.12);
+    congestion[n.id] = Math.max(0.05, Math.min(0.98, (congestion[n.id] || 0.5) + delta));
+  });
+  // Try to fetch live data (rate-limited internally)
+  fetchLiveTraffic();
+  densityHistory.push(avgCongestion());
+  if (densityHistory.length > 30) densityHistory.shift();
+}
+function avgCongestion() {
+  var vals = Object.values(congestion);
+  if (!vals.length) return 0;
+  return vals.reduce(function(a, b) { return a + b; }, 0) / vals.length;
+}
+function congColor(v) {
+  if (v < 0.3) return '#10b981';
+  if (v < 0.55) return '#f59e0b';
+  if (v < 0.75) return '#f97316';
+  return '#ef4444';
+}
+function congLabel(v) {
+  if (v < 0.3) return 'FREE';
+  if (v < 0.55) return 'MODERATE';
+  if (v < 0.75) return 'HEAVY';
+  return 'CRITICAL';
+}
+
+// ===================== MAP PROJECTION =====================
+function buildProjection(city, W, H) {
+  var pad = 60;
+  var lats = city.nodes.map(function(n) { return n.lat; });
+  var lngs = city.nodes.map(function(n) { return n.lng; });
+  var minLat = Math.min.apply(null, lats), maxLat = Math.max.apply(null, lats);
+  var minLng = Math.min.apply(null, lngs), maxLng = Math.max.apply(null, lngs);
+  var dLat = maxLat - minLat || 0.01;
+  var dLng = maxLng - minLng || 0.01;
+  var scaleX = (W - pad * 2) / dLng;
+  var scaleY = (H - pad * 2) / dLat;
+  return { minLat: minLat, maxLat: maxLat, minLng: minLng, maxLng: maxLng,
+           scaleX: scaleX, scaleY: scaleY, padX: pad, padY: pad, W: W, H: H };
+}
+function project(proj, lat, lng) {
+  var x = proj.padX + (lng - proj.minLng) * proj.scaleX;
+  var y = proj.H - proj.padY - (lat - proj.minLat) * proj.scaleY;
+  return { x: x, y: y };
+}
+function projectWithTransform(proj, lat, lng) {
+  var p = project(proj, lat, lng);
+  return { x: p.x * mapZoom + mapPanX, y: p.y * mapZoom + mapPanY };
+}
+
+// ===================== FLOW DOTS =====================
+function initFlowDots() {
+  var city = CITIES[currentCity];
+  flowDots = [];
+  for (var i = 0; i < 15; i++) {
+    var edge = city.edges[i % city.edges.length];
+    flowDots.push({ edgeIdx: i % city.edges.length, t: Math.random() });
+  }
+}
+function tickFlowDots() {
+  var city = CITIES[currentCity];
+  flowDots.forEach(function(dot) {
+    var edge = city.edges[dot.edgeIdx];
+    var v = ((congestion[edge.from] || 0.5) + (congestion[edge.to] || 0.5)) / 2;
+    var speed = (1 - v) * 0.012 + 0.003;
+    dot.t += speed;
+    if (dot.t > 1) {
+      dot.t = 0;
+      dot.edgeIdx = Math.floor(Math.random() * city.edges.length);
+    }
+  });
+}
+
+// ===================== CANVAS DRAW =====================
+function drawMap() {
+  if (!mapCanvas || !mapCtx) return;
+  var city = CITIES[currentCity];
+  var W = mapCanvas.width, H = mapCanvas.height;
+  if (W < 10 || H < 10) return;
+  var proj = buildProjection(city, W, H);
+  mapProjection = proj;
+  var ctx = mapCtx;
+  ctx.clearRect(0, 0, W, H);
+  // transparent — Leaflet base shows through
+  ctx.clearRect(0, 0, W, H);
+
+  // --- HEATMAP ---
+  if (showHeatmap) {
+    city.nodes.forEach(function(n) {
+      var v = congestion[n.id] || 0.5;
+      var p = projectWithTransform(proj, n.lat, n.lng);
+      var r = (50 + v * 80) * mapZoom;
+      var col = congColor(v);
+      var grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      grad.addColorStop(0, col + '55');
+      grad.addColorStop(1, col + '00');
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+    });
+  }
+
+  // --- EDGES ---
+  city.edges.forEach(function(edge) {
+    var fn = city.nodes.find(function(n) { return n.id === edge.from; });
+    var tn = city.nodes.find(function(n) { return n.id === edge.to; });
+    if (!fn || !tn) return;
+    var v = ((congestion[edge.from] || 0.5) + (congestion[edge.to] || 0.5)) / 2;
+    var col = congColor(v);
+    var fp = projectWithTransform(proj, fn.lat, fn.lng);
+    var tp = projectWithTransform(proj, tn.lat, tn.lng);
+    var isHL = highlightedPath && highlightedPath.some(function(p) {
+      return (p.from === edge.from && p.to === edge.to) || (p.from === edge.to && p.to === edge.from);
+    });
+    ctx.save();
+    if (isHL) {
+      ctx.shadowColor = '#00d4ff';
+      ctx.shadowBlur = 20;
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 7;
+      ctx.setLineDash([12, 6]);
+    } else {
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 8;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 4;
+      ctx.setLineDash([]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(fp.x, fp.y);
+    ctx.lineTo(tp.x, tp.y);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // --- FLOW DOTS ---
+  flowDots.forEach(function(dot) {
+    var edge = city.edges[dot.edgeIdx];
+    if (!edge) return;
+    var fn = city.nodes.find(function(n) { return n.id === edge.from; });
+    var tn = city.nodes.find(function(n) { return n.id === edge.to; });
+    if (!fn || !tn) return;
+    var fp = projectWithTransform(proj, fn.lat, fn.lng);
+    var tp = projectWithTransform(proj, tn.lat, tn.lng);
+    var x = fp.x + (tp.x - fp.x) * dot.t;
+    var y = fp.y + (tp.y - fp.y) * dot.t;
+    ctx.save();
+    ctx.shadowColor = '#00d4ff';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#00d4ff';
+    ctx.globalAlpha = 0.9;
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // --- NODES ---
+  city.nodes.forEach(function(n) {
+    var v = congestion[n.id] || 0.5;
+    var col = congColor(v);
+    var p = projectWithTransform(proj, n.lat, n.lng);
+    // Node circle
+    ctx.save();
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+    // Signal indicator
+    if (showSignals) {
+      var sigCol = v > 0.7 ? '#ef4444' : v > 0.4 ? '#f59e0b' : '#10b981';
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(p.x + 8, p.y - 8, 4, 0, Math.PI * 2);
+      ctx.fillStyle = sigCol;
+      ctx.shadowColor = sigCol;
+      ctx.shadowBlur = 6;
+      ctx.fill();
+      ctx.restore();
+    }
+    // Label
+    ctx.save();
+    ctx.font = 'bold 11px Inter';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#000000';
+    ctx.shadowBlur = 4;
+    ctx.fillText(n.label, p.x, p.y + 20);
+    ctx.restore();
+  });
+}
+
+function animLoop() {
+  tickFlowDots();
+  drawMap();
+  syncLeafletToCanvas();
+  animFrameId = requestAnimationFrame(animLoop);
+}
+function startAnim() {
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  animLoop();
+}
+
+// ===================== LEAFLET BASE MAP =====================
+var lmap = null;
+var lTileLayer = null;
+var MAP_TILES = {
+  street: {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attr: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+    filter: 'brightness(0.82) saturate(0.75)'
+  },
+  dark: {
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attr: '© <a href="https://carto.com">CARTO</a>',
+    filter: 'brightness(0.9) saturate(0.6)'
+  },
+  satellite: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attr: '© <a href="https://www.esri.com">Esri</a>',
+    filter: 'brightness(0.88) saturate(0.8) contrast(1.05)'
+  }
+};
+var CITY_CENTERS = {
+  bengaluru: [12.9716, 77.5946],
+  hyderabad: [17.3850, 78.4867],
+  delhi:     [28.6139, 77.2090],
+  kalaburagi:[17.3297, 76.8200]
+};
+var CITY_ZOOM = { bengaluru:12, hyderabad:12, delhi:11, kalaburagi:14 };
+var currentMapStyle = 'street';
+
+function initLeafletBase() {
+  var center = CITY_CENTERS[currentCity] || [12.9716, 77.5946];
+  var zoom   = CITY_ZOOM[currentCity] || 12;
+  if (lmap) {
+    lmap.setView(center, zoom);
+    return;
+  }
+  lmap = L.map('leaflet-base', {
+    zoomControl: false,
+    attributionControl: true,
+    dragging: false,       // canvas handles pan
+    scrollWheelZoom: false,// canvas handles zoom
+    doubleClickZoom: false,
+    touchZoom: false,
+    keyboard: false
+  }).setView(center, zoom);
+  applyTileLayer(currentMapStyle);
+}
+
+function applyTileLayer(style) {
+  var t = MAP_TILES[style] || MAP_TILES.street;
+  if (lTileLayer) lmap.removeLayer(lTileLayer);
+  lTileLayer = L.tileLayer(t.url, { attribution: t.attr, maxZoom: 19 }).addTo(lmap);
+  document.querySelector('.leaflet-tile-pane') && (document.querySelector('.leaflet-tile-pane').style.filter = t.filter);
+  currentMapStyle = style;
+}
+
+// Sync Leaflet view with canvas pan/zoom
+function syncLeafletToCanvas() {
+  if (!lmap || !mapProjection) return;
+  var proj = mapProjection;
+  var city = CITIES[currentCity];
+  // Find canvas center in lat/lng
+  var W = mapCanvas.width, H = mapCanvas.height;
+  var cx = (W / 2 - mapPanX) / mapZoom;
+  var cy = (H / 2 - mapPanY) / mapZoom;
+  // Invert projection
+  var lng = proj.minLng + cx / proj.scaleX;
+  var lat = proj.minLat + (proj.H - proj.padY - cy) / proj.scaleY;
+  // Map zoom: base zoom + log2(mapZoom)
+  var baseZoom = CITY_ZOOM[currentCity] || 12;
+  var lZoom = Math.round(baseZoom + Math.log2(mapZoom));
+  lZoom = Math.max(8, Math.min(18, lZoom));
+  lmap.setView([lat, lng], lZoom, { animate: false });
+  // Fix tile filter after style change
+  var pane = document.querySelector('.leaflet-tile-pane');
+  if (pane) pane.style.filter = (MAP_TILES[currentMapStyle] || MAP_TILES.street).filter;
+}
+
+// ===================== MAP CANVAS SETUP =====================
+function setupMapCanvas() {
+  mapCanvas = document.getElementById('map-canvas');
+  mapCtx = mapCanvas.getContext('2d');
+  resizeMapCanvas();
+  initLeafletBase();
+
+  // Pan
+  mapCanvas.addEventListener('mousedown', function(e) {
+    mapIsPanning = true;
+    mapPanStartX = e.clientX;
+    mapPanStartY = e.clientY;
+    mapPanStartPX = mapPanX;
+    mapPanStartPY = mapPanY;
+    mapCanvas.classList.add('panning');
+  });
+  window.addEventListener('mousemove', function(e) {
+    if (!mapIsPanning) return;
+    mapPanX = mapPanStartPX + (e.clientX - mapPanStartX);
+    mapPanY = mapPanStartPY + (e.clientY - mapPanStartY);
+  });
+  window.addEventListener('mouseup', function() {
+    mapIsPanning = false;
+    mapCanvas.classList.remove('panning');
+  });
+
+  // Touch pan
+  mapCanvas.addEventListener('touchstart', function(e) {
+    if (e.touches.length === 1) {
+      mapIsPanning = true;
+      mapPanStartX = e.touches[0].clientX;
+      mapPanStartY = e.touches[0].clientY;
+      mapPanStartPX = mapPanX;
+      mapPanStartPY = mapPanY;
+    }
+  }, { passive: true });
+  mapCanvas.addEventListener('touchmove', function(e) {
+    if (!mapIsPanning || e.touches.length !== 1) return;
+    mapPanX = mapPanStartPX + (e.touches[0].clientX - mapPanStartX);
+    mapPanY = mapPanStartPY + (e.touches[0].clientY - mapPanStartY);
+  }, { passive: true });
+  mapCanvas.addEventListener('touchend', function() { mapIsPanning = false; });
+
+  // Scroll zoom
+  mapCanvas.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    var factor = e.deltaY < 0 ? 1.12 : 0.89;
+    var rect = mapCanvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    mapPanX = mx - (mx - mapPanX) * factor;
+    mapPanY = my - (my - mapPanY) * factor;
+    mapZoom = Math.max(0.3, Math.min(8, mapZoom * factor));
+  }, { passive: false });
+
+  // Click to select road
+  mapCanvas.addEventListener('click', function(e) {
+    if (Math.abs(e.clientX - mapPanStartX) > 5 || Math.abs(e.clientY - mapPanStartY) > 5) return;
+    var rect = mapCanvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    handleMapClick(mx, my);
+  });
+
+  // Zoom buttons
+  document.getElementById('zoom-in').addEventListener('click', function() {
+    var cx = mapCanvas.width / 2, cy = mapCanvas.height / 2;
+    mapPanX = cx - (cx - mapPanX) * 1.3;
+    mapPanY = cy - (cy - mapPanY) * 1.3;
+    mapZoom = Math.min(8, mapZoom * 1.3);
+  });
+  document.getElementById('zoom-out').addEventListener('click', function() {
+    var cx = mapCanvas.width / 2, cy = mapCanvas.height / 2;
+    mapPanX = cx - (cx - mapPanX) * 0.77;
+    mapPanY = cy - (cy - mapPanY) * 0.77;
+    mapZoom = Math.max(0.3, mapZoom * 0.77);
+  });
+  document.getElementById('zoom-reset').addEventListener('click', function() {
+    mapZoom = 1.0; mapPanX = 0; mapPanY = 0;
+  });
+
+  // Layer toggles
+  document.getElementById('tog-heatmap').addEventListener('change', function() {
+    showHeatmap = this.checked;
+  });
+  document.getElementById('tog-signals').addEventListener('change', function() {
+    showSignals = this.checked;
+  });
+
+  // Map style switcher
+  document.getElementById('map-style-select').addEventListener('change', function() {
+    applyTileLayer(this.value);
+    // Satellite: remove dark filter on canvas so overlay is more visible
+    mapCanvas.style.opacity = this.value === 'satellite' ? '0.92' : '1';
+  });
+}
+
+function resizeMapCanvas() {
+  var container = document.getElementById('map-center');
+  if (!container || !mapCanvas) return;
+  mapCanvas.width = container.clientWidth;
+  mapCanvas.height = container.clientHeight;
+  if (lmap) lmap.invalidateSize();
+}
+
+function handleMapClick(mx, my) {
+  var city = CITIES[currentCity];
+  if (!mapProjection) return;
+  var proj = mapProjection;
+  var bestEdge = null, bestDist = 18;
+  city.edges.forEach(function(edge) {
+    var fn = city.nodes.find(function(n) { return n.id === edge.from; });
+    var tn = city.nodes.find(function(n) { return n.id === edge.to; });
+    if (!fn || !tn) return;
+    var fp = projectWithTransform(proj, fn.lat, fn.lng);
+    var tp = projectWithTransform(proj, tn.lat, tn.lng);
+    var d = distToSegment(mx, my, fp.x, fp.y, tp.x, tp.y);
+    if (d < bestDist) { bestDist = d; bestEdge = edge; }
+  });
+  if (bestEdge) {
+    highlightRoad(bestEdge.from, bestEdge.to);
+  }
+}
+function distToSegment(px, py, ax, ay, bx, by) {
+  var dx = bx - ax, dy = by - ay;
+  var len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(px - ax, py - ay);
+  var t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+// ===================== METRICS BAR =====================
+function renderMetricsBar() {
+  var city = CITIES[currentCity];
+  var avg = avgCongestion();
+  var avgSpeed = Math.round((1 - avg) * 50 + 5);
+  var density = Math.round(avg * 100);
+  var congestedCount = city.edges.filter(function(e) {
+    var v = ((congestion[e.from] || 0.5) + (congestion[e.to] || 0.5)) / 2;
+    return v >= 0.55;
+  }).length;
+  var incCount = accidents.filter(function(a) {
+    return (Date.now() - a.time.getTime()) < 600000;
+  }).length + city.incidents.length;
+
+  var speedEl = document.getElementById('m-speed');
+  var densEl = document.getElementById('m-density');
+  var congEl = document.getElementById('m-cong');
+  var incEl = document.getElementById('m-inc');
+  if (speedEl) { speedEl.textContent = avgSpeed; speedEl.style.color = congColor(avg); }
+  if (densEl) { densEl.textContent = density + '%'; densEl.style.color = congColor(avg); }
+  if (congEl) { congEl.textContent = congestedCount; congEl.style.color = congestedCount > 5 ? '#ef4444' : congestedCount > 2 ? '#f97316' : '#10b981'; }
+  if (incEl) { incEl.textContent = incCount; incEl.style.color = incCount > 3 ? '#ef4444' : incCount > 1 ? '#f59e0b' : '#10b981'; }
+}
+
+// ===================== ROAD STATUS =====================
+function renderRoadStatus() {
+  var city = CITIES[currentCity];
+  var el = document.getElementById('road-status-list');
+  if (!el) return;
+  el.innerHTML = city.edges.map(function(edge) {
+    var v = ((congestion[edge.from] || 0.5) + (congestion[edge.to] || 0.5)) / 2;
+    var spd = Math.round((1 - v) * 50 + 5);
+    var tt = Math.round(2 / spd * 60);
+    var key = edge.from + '-' + edge.to;
+    var isSel = selectedRoadKey === key;
+    return '<div class="road-status-item' + (isSel ? ' selected' : '') + '" ' +
+      'onclick="highlightRoad(\'' + edge.from + '\',\'' + edge.to + '\')">' +
+      '<span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:' + congColor(v) + '"></span>' +
+      '<span style="flex:1;font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + edge.name + '</span>' +
+      '<span style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0">' +
+        '<span style="font-size:.68rem;font-weight:700;color:' + congColor(v) + '">' + congLabel(v) + '</span>' +
+        '<span style="font-size:.63rem;color:var(--text2)">' + spd + ' km/h · ' + tt + 'm</span>' +
+      '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function highlightRoad(fromId, toId) {
+  var city = CITIES[currentCity];
+  selectedRoadKey = fromId + '-' + toId;
+  highlightedPath = [{ from: fromId, to: toId }];
+  // Pan canvas to midpoint
+  var fn = city.nodes.find(function(n) { return n.id === fromId; });
+  var tn = city.nodes.find(function(n) { return n.id === toId; });
+  if (fn && tn && mapProjection && mapCanvas) {
+    var proj = mapProjection;
+    var fp = project(proj, fn.lat, fn.lng);
+    var tp = project(proj, tn.lat, tn.lng);
+    var midX = (fp.x + tp.x) / 2;
+    var midY = (fp.y + tp.y) / 2;
+    mapPanX = mapCanvas.width / 2 - midX * mapZoom;
+    mapPanY = mapCanvas.height / 2 - midY * mapZoom;
+  }
+  renderRoadStatus();
+}
+
+// ===================== CONTROL ALERTS =====================
+function renderControlAlerts() {
+  var city = CITIES[currentCity];
+  var el = document.getElementById('control-alerts');
+  if (!el) return;
+  var alerts = [];
+  city.nodes.forEach(function(n) {
+    var v = congestion[n.id] || 0;
+    if (v > 0.8) alerts.push({ cls: 'critical', msg: '🔴 ' + n.label + ': Critical (' + Math.round(v * 100) + '%) — Reroute advised' });
+    else if (v > 0.65) alerts.push({ cls: '', msg: '🟠 ' + n.label + ': Heavy (' + Math.round(v * 100) + '%) — Extend green phase' });
+    else if (v > 0.5) alerts.push({ cls: 'info', msg: '🟡 ' + n.label + ': Moderate (' + Math.round(v * 100) + '%) — Monitor' });
+  });
+  if (!alerts.length) alerts.push({ cls: 'info', msg: '✅ All corridors nominal' });
+  el.innerHTML = alerts.slice(0, 5).map(function(a) {
+    return '<div class="alert-card ' + a.cls + '">' + a.msg + '</div>';
+  }).join('');
+}
+
+// ===================== DENSITY CHART =====================
+function drawDensityChart() {
+  var canvas = document.getElementById('density-canvas');
+  if (!canvas) return;
+  var parent = canvas.parentElement;
+  var W = parent ? parent.clientWidth : 220;
+  canvas.width = W > 0 ? W : 220;
+  canvas.height = 90;
+  var ctx = canvas.getContext('2d');
+  var H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(148,163,184,0.4)';
+  ctx.font = '8px Inter';
+  ctx.textAlign = 'left';
+  ['100%', '50%', '0%'].forEach(function(lbl, i) { ctx.fillText(lbl, 2, 10 + i * 33); });
+  if (densityHistory.length < 2) {
+    ctx.fillStyle = 'rgba(0,212,255,0.2)';
+    ctx.fillRect(0, H - 2, W, 2);
+    return;
+  }
+  var grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, 'rgba(0,212,255,0.28)');
+  grad.addColorStop(1, 'rgba(0,212,255,0)');
+  var pts = densityHistory.map(function(v, i) {
+    return { x: 22 + i / (densityHistory.length - 1) * (W - 24), y: H - 4 - v * (H - 10) * 0.9 };
+  });
+  ctx.beginPath();
+  pts.forEach(function(p, i) { i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y); });
+  ctx.lineTo(pts[pts.length - 1].x, H - 4);
+  ctx.lineTo(pts[0].x, H - 4);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.beginPath();
+  pts.forEach(function(p, i) { i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y); });
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  var last = pts[pts.length - 1];
+  ctx.beginPath();
+  ctx.arc(last.x, last.y, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#00d4ff';
+  ctx.fill();
+  ctx.fillStyle = '#00d4ff';
+  ctx.font = 'bold 9px Inter';
+  ctx.textAlign = 'right';
+  ctx.fillText(Math.round(densityHistory[densityHistory.length - 1] * 100) + '%', W - 2, last.y - 4);
+}
+
+// ===================== PREDICTION CARDS =====================
+function renderPredCards() {
+  var el = document.getElementById('pred-cards');
+  if (!el) return;
+  var base = avgCongestion();
+  var preds = [
+    { t: 'Current Peak', v: base },
+    { t: 'Predicted (+30m)', v: Math.min(1, Math.max(0, base + (Math.random() - 0.45) * 0.2)) },
+    { t: 'Confidence', v: 0.72 + Math.random() * 0.18, isConf: true }
+  ];
+  el.innerHTML = preds.map(function(p) {
+    var val = p.isConf ? Math.round(p.v * 100) + '%' : Math.round(p.v * 100) + '%';
+    var col = p.isConf ? 'var(--accent)' : congColor(p.v);
+    return '<div class="pred-card">' +
+      '<span style="color:var(--text2)">' + p.t + '</span>' +
+      '<span style="color:' + col + ';font-weight:700;font-size:.9rem">' + val + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+// ===================== SIGNALS =====================
+function renderSignals() {
+  var el = document.getElementById('signal-grid');
+  if (!el) return;
+  var city = CITIES[currentCity];
+  var newActions = [];
+  el.innerHTML = city.signals.slice(0, 6).map(function(s, i) {
+    var node = city.nodes[i] || city.nodes[0];
+    var v = congestion[node.id] || 0.5;
+    var color = v > 0.7 ? '#ef4444' : v > 0.4 ? '#f59e0b' : '#10b981';
+    var phase = v > 0.7 ? 'RED' : v > 0.4 ? 'AMBER' : 'GREEN';
+    var cycle = v > 0.7 ? Math.round(90 + v * 30) : v > 0.4 ? Math.round(60 + v * 20) : Math.round(40 + v * 15);
+    if (v > 0.75) newActions.push({ jn: s, action: 'extend_green +15s', sev: 'critical', time: new Date() });
+    else if (v > 0.55) newActions.push({ jn: s, action: 'extend_green +8s', sev: 'warning', time: new Date() });
+    else if (v < 0.3) newActions.push({ jn: s, action: 'reduce_cycle -10s', sev: 'info', time: new Date() });
+    return '<div class="signal-item">' +
+      '<div style="font-size:.65rem;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + s + '">' + s + '</div>' +
+      '<span class="signal-light" style="background:' + color + '"></span>' +
+      '<div style="color:' + color + ';font-weight:700;font-size:.68rem">' + phase + '</div>' +
+      '<div style="color:var(--text2);font-size:.63rem">' + cycle + 's</div>' +
+    '</div>';
+  }).join('');
+  newActions.forEach(function(a) { signalActionLog.unshift(a); });
+  if (signalActionLog.length > 20) signalActionLog = signalActionLog.slice(0, 20);
+  var logEl = document.getElementById('signal-log');
+  if (!logEl) return;
+  if (!signalActionLog.length) {
+    logEl.innerHTML = '<div style="color:var(--text2);font-size:.7rem;padding:3px 0">No actions yet.</div>';
+    return;
+  }
+  var sevBorder = { critical: 'var(--red)', warning: 'var(--orange)', info: 'var(--accent)' };
+  logEl.innerHTML = signalActionLog.slice(0, 8).map(function(a) {
+    var t = a.time.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return '<div style="display:flex;gap:6px;font-size:.68rem;padding:3px 6px;border-radius:4px;background:var(--surface2);border-left:2px solid ' + (sevBorder[a.sev] || 'var(--accent)') + '">' +
+      '<span style="color:var(--text2);white-space:nowrap;flex-shrink:0">' + t + '</span>' +
+      '<span style="color:var(--text)">' + a.jn + ': <strong>' + a.action + '</strong></span>' +
+    '</div>';
+  }).join('');
+}
+
+// ===================== INCIDENTS =====================
+function renderIncidents() {
+  var el = document.getElementById('incidents-list');
+  if (!el) return;
+  var city = CITIES[currentCity];
+  var icons = { congestion: '🚦', accident: '🚨', roadwork: '🚧', waterlogging: '🌊' };
+  var items = city.incidents.map(function(inc) {
+    var nodeObj = city.nodes.find(function(n) { return n.id === inc.node; });
+    return { icon: icons[inc.type] || '⚠️', title: nodeObj ? nodeObj.label : inc.node, type: inc.type, desc: inc.desc, sev: 'ACTIVE' };
+  });
+  accidents.slice(0, 3).forEach(function(acc) {
+    items.push({ icon: icons[acc.type] || '🚨', title: acc.loc, type: acc.type, desc: acc.desc, sev: acc.sev });
+  });
+  if (!items.length) {
+    el.innerHTML = '<div style="color:var(--text2);font-size:.75rem;padding:6px 0">No active incidents</div>';
+    return;
+  }
+  el.innerHTML = items.slice(0, 7).map(function(inc) {
+    var sevColor = inc.sev === 'CRITICAL' ? 'var(--red)' : inc.sev === 'HIGH' ? 'var(--orange)' : inc.sev === 'MEDIUM' ? 'var(--yellow)' : inc.sev === 'ACTIVE' ? 'var(--accent)' : 'var(--green)';
+    return '<div style="display:flex;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);align-items:flex-start">' +
+      '<span style="font-size:.95rem;flex-shrink:0">' + inc.icon + '</span>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:.75rem;font-weight:600">' + inc.title + '</div>' +
+        '<div style="font-size:.68rem;color:var(--text2)">' + inc.desc + '</div>' +
+      '</div>' +
+      '<span style="font-size:.62rem;font-weight:700;color:' + sevColor + ';flex-shrink:0;padding:2px 5px;background:' + sevColor + '22;border-radius:3px">' + inc.sev + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+// ===================== ROUTE PLANNER =====================
+function buildRouteDropdowns() {
+  var city = CITIES[currentCity];
+  var opts = city.nodes.map(function(n) { return '<option value="' + n.id + '">' + n.label + '</option>'; }).join('');
+  document.getElementById('route-from').innerHTML = opts;
+  document.getElementById('route-to').innerHTML = opts;
+  if (city.nodes.length > 1) document.getElementById('route-to').selectedIndex = 1;
+}
+function findRoute() {
+  var city = CITIES[currentCity];
+  var fromId = document.getElementById('route-from').value;
+  var toId = document.getElementById('route-to').value;
+  if (fromId === toId) { alert('Select different locations'); return; }
+  var path = bfs(city, fromId, toId);
+  var resultEl = document.getElementById('route-result-panel');
+  if (!path) {
+    if (resultEl) resultEl.innerHTML = '<div style="color:var(--red);font-size:.75rem;padding:5px 0">No route found.</div>';
+    return;
+  }
+  var steps = [], totalTime = 0, totalDist = 0;
+  for (var i = 0; i < path.length - 1; i++) {
+    var edge = city.edges.find(function(e) { return (e.from === path[i] && e.to === path[i + 1]) || (e.to === path[i] && e.from === path[i + 1]); });
+    var v = edge ? ((congestion[edge.from] || 0.5) + (congestion[edge.to] || 0.5)) / 2 : 0.5;
+    var spd = Math.round((1 - v) * 50 + 5);
+    var dist = 1.5 + Math.random() * 2;
+    var tt = Math.round(dist / spd * 60);
+    totalTime += tt; totalDist += dist;
+    steps.push({ road: edge ? edge.name : 'Road', v: v, spd: spd, tt: tt });
+  }
+  var overallV = steps.reduce(function(a, s) { return a + s.v; }, 0) / (steps.length || 1);
+  highlightedPath = [];
+  for (var j = 0; j < path.length - 1; j++) highlightedPath.push({ from: path[j], to: path[j + 1] });
+  if (resultEl) {
+    resultEl.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
+        '<span style="font-weight:700;font-size:.8rem">Route Found</span>' +
+        '<span style="font-size:.67rem;font-weight:700;color:' + congColor(overallV) + ';background:' + congColor(overallV) + '22;padding:2px 6px;border-radius:4px">' + congLabel(overallV) + '</span>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;margin-bottom:7px;font-size:.72rem;color:var(--text2)">' +
+        '<span>⏱ <strong style="color:var(--text)">' + totalTime + ' min</strong></span>' +
+        '<span>📍 <strong style="color:var(--text)">' + totalDist.toFixed(1) + ' km</strong></span>' +
+        '<span>🛣 <strong style="color:var(--text)">' + steps.length + ' roads</strong></span>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto">' +
+      steps.map(function(s) {
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 5px;background:var(--surface2);border-radius:4px;font-size:.7rem">' +
+          '<span style="display:flex;align-items:center;gap:4px">' +
+            '<span style="width:5px;height:5px;border-radius:50%;background:' + congColor(s.v) + ';flex-shrink:0"></span>' +
+            '<span>' + s.road + '</span>' +
+          '</span>' +
+          '<span style="color:var(--text2)">' + s.tt + 'm · ' + s.spd + 'km/h</span>' +
+        '</div>';
+      }).join('') +
+      '</div>';
+  }
+}
+function bfs(city, start, end) {
+  var queue = [[start]], visited = {};
+  while (queue.length) {
+    var path = queue.shift();
+    var node = path[path.length - 1];
+    if (node === end) return path;
+    if (visited[node]) continue;
+    visited[node] = true;
+    city.edges.forEach(function(e) {
+      if (e.from === node && !visited[e.to]) queue.push(path.concat(e.to));
+      if (e.to === node && !visited[e.from]) queue.push(path.concat(e.from));
+    });
+  }
+  return null;
+}
+
+// ===================== ACCIDENTS =====================
+var ACC_TYPES = ['collision', 'breakdown', 'roadwork', 'waterlogging', 'signal failure'];
+var ACC_DESCS = {
+  collision:        'Multi-vehicle collision blocking lanes',
+  breakdown:        'Vehicle breakdown causing obstruction',
+  roadwork:         'Road maintenance work in progress',
+  waterlogging:     'Road blocked due to Bhima River overflow — Afzalpur/Sedam area affected',
+  'signal failure': 'Traffic signal malfunction'
+};
+function autoGenerateAccident() {
+  var city = CITIES[currentCity];
+  var highNodes = city.nodes.filter(function(n) { return (congestion[n.id] || 0) > 0.65; });
+  var node = highNodes.length > 0 ? highNodes[Math.floor(Math.random() * highNodes.length)] : city.nodes[Math.floor(Math.random() * city.nodes.length)];
+  var v = congestion[node.id] || 0.5;
+  var sev = v > 0.85 ? 'CRITICAL' : v > 0.7 ? 'HIGH' : v > 0.5 ? 'MEDIUM' : 'LOW';
+  var type = ACC_TYPES[Math.floor(Math.random() * ACC_TYPES.length)];
+  accidents.unshift({ id: Date.now(), sev: sev, loc: node.label, type: type, desc: ACC_DESCS[type] || 'Incident reported', time: new Date(), sent: false, sending: false });
+  if (accidents.length > 10) accidents = accidents.slice(0, 10);
+  renderAccidents();
+  renderIncidents();
+}
+function renderAccidents() {
+  var el = document.getElementById('accidents-list');
+  if (!el) return;
+  if (!accidents.length) {
+    el.innerHTML = '<div style="text-align:center;padding:28px 0;color:var(--text2)">' +
+      '<div style="font-size:1.8rem;margin-bottom:7px">🔍</div>' +
+      '<div style="font-size:.82rem">Monitoring for incidents...</div>' +
+      '<div style="font-size:.72rem;margin-top:3px">Auto-detects every 8s from congestion data</div>' +
+    '</div>';
+    return;
+  }
+  el.innerHTML = accidents.map(function(acc) {
+    var secs = Math.round((Date.now() - acc.time.getTime()) / 1000);
+    var agoStr = secs < 60 ? secs + 's ago' : secs < 3600 ? Math.round(secs / 60) + 'm ago' : Math.round(secs / 3600) + 'h ago';
+    var sevColor = acc.sev === 'CRITICAL' ? 'var(--red)' : acc.sev === 'HIGH' ? 'var(--orange)' : acc.sev === 'MEDIUM' ? 'var(--yellow)' : 'var(--green)';
+    var btnHtml = acc.sending
+      ? '<button class="send-alert-btn" disabled><span class="spinner"></span>Sending...</button>'
+      : acc.sent
+        ? '<span class="alert-status">✓ Sent to server</span>'
+        : '<button class="send-alert-btn" onclick="sendAlert(' + acc.id + ')">📡 Send Alert</button>';
+    return '<div class="acc-card" style="border-left:3px solid ' + sevColor + '">' +
+      '<div class="acc-top"><span class="sev-badge sev-' + acc.sev + '">' + acc.sev + '</span><span class="acc-loc">' + acc.loc + '</span><span class="acc-type">' + acc.type + '</span></div>' +
+      '<div class="acc-desc">' + acc.desc + '</div>' +
+      '<div class="acc-bottom"><span class="acc-time">🕐 ' + agoStr + '</span>' + btnHtml + '</div>' +
+    '</div>';
+  }).join('');
+}
+// ===================== ALERT STORAGE =====================
+var SERVER_URL = 'http://localhost:3001';
+var STORAGE_KEY = 'namma_predict_alerts';
+
+function getStoredAlerts() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+function saveAlertLocally(payload) {
+  var stored = getStoredAlerts();
+  stored.unshift(payload);
+  if (stored.length > 50) stored = stored.slice(0, 50);
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stored)); } catch(e) {}
+}
+
+function sendAlert(id) {
+  var acc = accidents.find(function(a) { return a.id === id; });
+  if (!acc || acc.sent || acc.sending) return;
+  acc.sending = true;
+  renderAccidents();
+
+  var payload = {
+    id: acc.id,
+    severity: acc.sev,
+    location: acc.loc,
+    type: acc.type,
+    description: acc.desc,
+    city: currentCity,
+    timestamp: acc.time.toISOString(),
+    sentAt: new Date().toISOString()
+  };
+
+  // Save to localStorage immediately
+  saveAlertLocally(payload);
+
+  // POST to local server
+  fetch(SERVER_URL + '/api/alerts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    acc.sending = false;
+    acc.sent = true;
+    acc.serverId = data.id;
+    renderAccidents();
+    renderAlertLog();
+  })
+  .catch(function(err) {
+    console.warn('Server POST failed:', err);
+    acc.sending = false;
+    acc.sent = true;
+    renderAccidents();
+    renderAlertLog();
+  });
+}
+
+function renderAlertLog() {
+  var el = document.getElementById('alert-log-list');
+  if (!el) return;
+  var stored = getStoredAlerts();
+  if (!stored.length) {
+    el.innerHTML = '<div style="color:var(--text2);font-size:.78rem;padding:10px 0;text-align:center">No alerts sent yet.</div>';
+    return;
+  }
+  var sevColor = { CRITICAL:'var(--red)', HIGH:'var(--orange)', MEDIUM:'var(--yellow)', LOW:'var(--green)' };
+  el.innerHTML = stored.map(function(a) {
+    var d = new Date(a.sentAt || a.timestamp);
+    var timeStr = d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    var dateStr = d.toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
+    var col = sevColor[a.severity] || 'var(--accent)';
+    return '<div style="display:flex;gap:9px;padding:8px 10px;background:var(--surface2);border-radius:7px;border-left:3px solid ' + col + '">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">' +
+          '<span style="font-size:.63rem;font-weight:700;padding:2px 6px;border-radius:3px;background:' + col + ';color:' + (a.severity==='MEDIUM'?'#000':'#fff') + '">' + a.severity + '</span>' +
+          '<span style="font-size:.78rem;font-weight:600">' + a.location + '</span>' +
+          '<span style="font-size:.68rem;color:var(--text2);background:var(--surface);padding:1px 5px;border-radius:3px">' + a.type + '</span>' +
+        '</div>' +
+        '<div style="font-size:.7rem;color:var(--text2)">' + a.description + '</div>' +
+        '<div style="font-size:.65rem;color:var(--text2);margin-top:3px">📍 ' + a.city + ' &nbsp;🕐 ' + dateStr + ' ' + timeStr + '</div>' +
+      '</div>' +
+      '<span style="font-size:.65rem;color:var(--green);font-weight:600;flex-shrink:0">✓ Sent</span>' +
+    '</div>';
+  }).join('');
+}
+
+function clearAlertLog() {
+  if (!confirm('Clear all stored alerts?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  renderAlertLog();
+}
+
+// ===================== PARKING =====================
+function initParking() {
+  parkingState = {};
+  var zones = PARKING_DATA[currentCity] || [];
+  zones.forEach(function(z, i) {
+    parkingState[i] = { avail: Math.round(z.total * (1 - Math.random() * 0.9 - 0.05)), reserved: false };
+  });
+}
+function tickParking() {
+  var zones = PARKING_DATA[currentCity] || [];
+  zones.forEach(function(z, i) {
+    var s = parkingState[i];
+    if (!s) return;
+    s.avail = Math.max(0, Math.min(z.total, s.avail + Math.floor((Math.random() - 0.5) * 8)));
+  });
+}
+function renderParkingGrid() {
+  var el = document.getElementById('parking-grid');
+  if (!el) return;
+  var zones = PARKING_DATA[currentCity] || [];
+  el.innerHTML = zones.map(function(z, i) {
+    var s = parkingState[i] || { avail: 0, reserved: false };
+    var occ = Math.round((1 - s.avail / z.total) * 100);
+    var barColor = occ > 90 ? 'var(--red)' : occ > 70 ? 'var(--orange)' : occ > 50 ? 'var(--yellow)' : 'var(--green)';
+    var status = s.avail === 0 ? 'FULL' : occ > 85 ? 'CLOSING' : 'OPEN';
+    return '<div class="park-card">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<div class="park-name">' + z.name + '</div>' +
+        '<span class="park-status park-' + status + '">' + status + '</span>' +
+      '</div>' +
+      '<div class="park-stats"><span>Total: <strong>' + z.total + '</strong></span><span>Available: <strong style="color:' + barColor + '">' + s.avail + '</strong></span></div>' +
+      '<div class="occ-bar-bg"><div class="occ-bar-fill" style="width:' + occ + '%;background:' + barColor + '"></div></div>' +
+      '<div class="park-meta"><span>' + occ + '% occupied</span><span>₹' + z.price + '/hr</span><span>' + z.dist + '</span></div>' +
+      '<button class="reserve-btn' + (s.reserved ? ' reserved' : '') + '" ' + (s.reserved ? 'disabled' : '') + ' onclick="reserveParking(' + i + ')">' + (s.reserved ? 'Reserved ✓' : 'Reserve') + '</button>' +
+    '</div>';
+  }).join('');
+}
+function reserveParking(i) {
+  if (parkingState[i]) { parkingState[i].reserved = true; if (parkingState[i].avail > 0) parkingState[i].avail--; renderParkingGrid(); }
+}
+
+// ===================== ANALYTICS =====================
+function renderAnalytics() {
+  renderStatCards();
+  drawSpeedDistChart();
+  drawCongHourChart();
+  renderCongTable();
+  renderCityCompare();
+}
+function renderStatCards() {
+  var el = document.getElementById('stat-cards');
+  if (!el) return;
+  var avg = avgCongestion();
+  el.innerHTML = [
+    { label: 'Total Vehicles Today', value: Math.round(120000 + Math.random() * 30000).toLocaleString(), sub: '↑ 4.2% vs yesterday' },
+    { label: 'Peak Hour Congestion', value: Math.round(avg * 100 + Math.random() * 10) + '%', sub: 'Last peak: 9:00 AM' },
+    { label: 'Avg Travel Time', value: Math.round(25 + avg * 30) + ' min', sub: 'Baseline: 22 min' },
+    { label: 'Incidents Resolved', value: Math.round(12 + Math.random() * 8), sub: '3 pending' }
+  ].map(function(s) {
+    return '<div class="stat-card"><div class="stat-label">' + s.label + '</div><div class="stat-value">' + s.value + '</div><div class="stat-sub">' + s.sub + '</div></div>';
+  }).join('');
+}
+function drawSpeedDistChart() {
+  var canvas = document.getElementById('speed-dist-canvas');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth || 400;
+  canvas.height = 150;
+  var ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  var avg = avgCongestion();
+  var bands = [
+    { label: '0-10', v: avg * 0.3 }, { label: '10-20', v: avg * 0.25 },
+    { label: '20-30', v: 0.2 + Math.random() * 0.05 }, { label: '30-40', v: 0.15 + Math.random() * 0.05 },
+    { label: '40-50', v: (1 - avg) * 0.15 }, { label: '50+', v: (1 - avg) * 0.1 }
+  ];
+  var total = bands.reduce(function(a, b) { return a + b.v; }, 0);
+  var barW = (W - 60) / bands.length;
+  var colors = ['#ef4444', '#f97316', '#f59e0b', '#10b981', '#00d4ff', '#7c3aed'];
+  bands.forEach(function(b, i) {
+    var pct = b.v / total;
+    var bh = pct * (H - 40);
+    var x = 30 + i * barW + barW * 0.1;
+    var y = H - 20 - bh;
+    ctx.fillStyle = colors[i];
+    ctx.fillRect(x, y, barW * 0.8, bh);
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '9px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText(b.label, x + barW * 0.4, H - 6);
+    ctx.fillText(Math.round(pct * 100) + '%', x + barW * 0.4, y - 4);
+  });
+}
+function drawCongHourChart() {
+  var canvas = document.getElementById('cong-hour-canvas');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth || 400;
+  canvas.height = 150;
+  var ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  var data = [];
+  for (var h = 0; h < 24; h++) {
+    var base = h >= 8 && h <= 10 ? 0.85 : h >= 17 && h <= 20 ? 0.9 : h >= 0 && h <= 5 ? 0.15 : 0.4;
+    data.push(base + Math.random() * 0.1 - 0.05);
+  }
+  ctx.beginPath();
+  data.forEach(function(v, i) {
+    var x = 20 + i * (W - 40) / 23, y = H - 20 - v * (H - 40);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#7c3aed'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.lineTo(W - 20, H - 20); ctx.lineTo(20, H - 20); ctx.closePath();
+  ctx.fillStyle = 'rgba(124,58,237,0.1)'; ctx.fill();
+  [0, 6, 12, 18, 23].forEach(function(h) {
+    var x = 20 + h * (W - 40) / 23;
+    ctx.fillStyle = '#94a3b8'; ctx.font = '9px Inter'; ctx.textAlign = 'center';
+    ctx.fillText(h + ':00', x, H - 4);
+  });
+}
+function renderCongTable() {
+  var el = document.getElementById('cong-table');
+  if (!el) return;
+  var city = CITIES[currentCity];
+  var rows = city.edges.map(function(e) {
+    var v = ((congestion[e.from] || 0.5) + (congestion[e.to] || 0.5)) / 2;
+    return { name: e.name, density: Math.round(v * 100), speed: Math.round((1 - v) * 50 + 5), trend: Math.random() > 0.5 ? '↑' : '↓' };
+  }).sort(function(a, b) { return b.density - a.density; }).slice(0, 5);
+  el.innerHTML = '<tr><th>Road</th><th>Density %</th><th>Avg Speed</th><th>Trend</th></tr>' +
+    rows.map(function(r) {
+      return '<tr><td>' + r.name + '</td><td style="color:' + congColor(r.density / 100) + '">' + r.density + '%</td><td>' + r.speed + ' km/h</td><td class="' + (r.trend === '↑' ? 'trend-up' : 'trend-dn') + '">' + r.trend + '</td></tr>';
+    }).join('');
+}
+function renderCityCompare() {
+  var el = document.getElementById('city-compare-table');
+  if (!el) return;
+  var rows = Object.keys(CITIES).map(function(k) {
+    var city = CITIES[k];
+    var avg = city.nodes.reduce(function(a, n) { return a + (congestion[n.id] || Math.random() * 0.6 + 0.2); }, 0) / city.nodes.length;
+    return '<tr' + (k === currentCity ? ' style="color:var(--accent)"' : '') + '><td>' + city.name + '</td><td>' + Math.round((1 - avg) * 50 + 5) + ' km/h</td><td>' + Math.round(avg * 100) + '%</td></tr>';
+  }).join('');
+  el.innerHTML = '<tr><th>City</th><th>Avg Speed</th><th>Density</th></tr>' + rows;
+}
+
+// ===================== REROUTE =====================
+function buildRerouteDropdowns() {
+  var city = CITIES[currentCity];
+  var opts = city.nodes.map(function(n) { return '<option value="' + n.id + '">' + n.label + '</option>'; }).join('');
+  document.getElementById('rr-from').innerHTML = opts;
+  document.getElementById('rr-to').innerHTML = opts;
+  if (city.nodes.length > 1) document.getElementById('rr-to').selectedIndex = Math.min(3, city.nodes.length - 1);
+}
+function calcRoutes() {
+  var city = CITIES[currentCity];
+  var fromId = document.getElementById('rr-from').value;
+  var toId = document.getElementById('rr-to').value;
+  if (fromId === toId) { alert('Select different nodes'); return; }
+  var allPaths = findMultiplePaths(city, fromId, toId, 3);
+  if (!allPaths.length) { alert('No routes found'); return; }
+  while (allPaths.length < 3) allPaths.push(allPaths[0]);
+  var labels = ['Route A: Fastest', 'Route B: Alternate 1', 'Route C: Alternate 2'];
+  var descs = ['Primary route via main roads', 'Avoids highest congestion roads', 'Longest but clearest path'];
+  var el = document.getElementById('routes-row');
+  el.innerHTML = allPaths.map(function(path, ri) {
+    var steps = [];
+    for (var i = 0; i < path.length - 1; i++) {
+      var edge = city.edges.find(function(e) { return (e.from === path[i] && e.to === path[i + 1]) || (e.to === path[i] && e.from === path[i + 1]); });
+      var v = edge ? ((congestion[edge.from] || 0.5) + (congestion[edge.to] || 0.5)) / 2 : 0.5;
+      steps.push({ road: edge ? edge.name : 'Unknown Rd', v: v });
+    }
+    var totalV = steps.reduce(function(a, s) { return a + s.v; }, 0) / Math.max(steps.length, 1);
+    var dist = (steps.length * 1.8 + Math.random() * 2).toFixed(1);
+    var time = Math.round(steps.length * 4 + totalV * 15 + Math.random() * 5);
+    var scoreLabel = totalV > 0.75 ? 'CRITICAL' : totalV > 0.55 ? 'HIGH' : totalV > 0.35 ? 'MEDIUM' : 'LOW';
+    var stepsHtml = steps.map(function(s) {
+      return '<div class="route-step"><span>' + s.road + '</span><span class="road-pill" style="background:' + congColor(s.v) + ';color:' + (s.v > 0.55 ? '#fff' : '#000') + '">' + congLabel(s.v) + '</span></div>';
+    }).join('');
+    return '<div class="route-card">' +
+      '<div class="route-label">' + labels[ri] + '</div>' +
+      '<div class="route-name">' + descs[ri] + '</div>' +
+      '<div class="route-meta"><span>⏱ ' + time + ' min</span><span>📍 ' + dist + ' km</span><span class="cong-score cong-' + scoreLabel + '">' + scoreLabel + '</span></div>' +
+      '<div class="route-steps">' + stepsHtml + '</div>' +
+      '<button class="activate-btn" id="activate-' + ri + '" onclick="activateReroute(' + ri + ',\'' + path.join(',') + '\')">🔀 Activate Reroute</button>' +
+    '</div>';
+  }).join('');
+}
+function findMultiplePaths(city, start, end, count) {
+  var results = [], queue = [[start]], seen = {};
+  while (queue.length && results.length < count) {
+    var path = queue.shift();
+    var node = path[path.length - 1];
+    if (node === end) { results.push(path); continue; }
+    var key = path.join('-');
+    if (seen[key]) continue;
+    seen[key] = true;
+    city.edges.forEach(function(e) {
+      if (e.from === node && path.indexOf(e.to) === -1) queue.push(path.concat(e.to));
+      if (e.to === node && path.indexOf(e.from) === -1) queue.push(path.concat(e.from));
+    });
+  }
+  return results;
+}
+function activateReroute(ri, pathStr) {
+  var btn = document.getElementById('activate-' + ri);
+  if (btn) { btn.textContent = '✅ Reroute Activated'; btn.classList.add('activated'); btn.disabled = true; }
+  var city = CITIES[currentCity];
+  var path = pathStr.split(',');
+  var avoidEdge = null, altEdge = null;
+  for (var i = 0; i < path.length - 1; i++) {
+    var e = city.edges.find(function(e) { return (e.from === path[i] && e.to === path[i + 1]) || (e.to === path[i] && e.from === path[i + 1]); });
+    if (e && !avoidEdge) { var v = ((congestion[e.from] || 0.5) + (congestion[e.to] || 0.5)) / 2; if (v > 0.6) avoidEdge = e; }
+  }
+  var altEdges = city.edges.filter(function(e) { return path.indexOf(e.from) === -1 || path.indexOf(e.to) === -1; });
+  if (altEdges.length) altEdge = altEdges[Math.floor(Math.random() * altEdges.length)];
+  if (avoidEdge || altEdge) {
+    activeAdvisories.unshift({ avoid: avoidEdge ? avoidEdge.name : 'Main corridor', alt: altEdge ? altEdge.name : 'Alternate route', time: new Date() });
+    if (activeAdvisories.length > 5) activeAdvisories = activeAdvisories.slice(0, 5);
+    renderAdvisories();
+  }
+}
+function renderAdvisories() {
+  var el = document.getElementById('advisories-list');
+  if (!el) return;
+  if (!activeAdvisories.length) {
+    el.innerHTML = '<div style="color:var(--text2);font-size:.8rem;padding:9px 0">No active advisories. Activate a reroute above.</div>';
+    return;
+  }
+  el.innerHTML = activeAdvisories.map(function(a) {
+    var ago = Math.round((Date.now() - a.time.getTime()) / 1000);
+    var agoStr = ago < 60 ? ago + 's ago' : Math.round(ago / 60) + 'm ago';
+    return '<div class="advisory-item">' +
+      '<span style="color:var(--red)">🚫 Avoid: <strong>' + a.avoid + '</strong></span>' +
+      '<span style="color:var(--green)">→ Use: <strong>' + a.alt + '</strong></span>' +
+      '<span style="color:var(--text2);margin-left:auto">' + agoStr + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+// ===================== CLOCK & EXPORT =====================
+function updateClock() {
+  var el = document.getElementById('clock');
+  if (el) el.textContent = new Date().toLocaleTimeString();
+}
+function exportData() {
+  var data = { city: currentCity, timestamp: new Date().toISOString(), congestion: congestion, accidents: accidents.map(function(a) { return { sev: a.sev, loc: a.loc, type: a.type, desc: a.desc }; }), avgDensity: Math.round(avgCongestion() * 100) + '%' };
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'namma-predict-export.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ===================== CITY CHANGE =====================
+function switchCity(city) {
+  currentCity = city;
+  congestion = {};
+  densityHistory = [];
+  highlightedPath = null;
+  selectedRoadKey = null;
+  signalActionLog = [];
+  flowDots = [];
+  mapZoom = 1.0; mapPanX = 0; mapPanY = 0;
+  initCongestion();
+  initParking();
+  buildRouteDropdowns();
+  buildRerouteDropdowns();
+  renderRoadStatus();
+  renderSignals();
+  renderPredCards();
+  renderParkingGrid();
+  renderAnalytics();
+  renderControlAlerts();
+  renderIncidents();
+  renderMetricsBar();
+  initFlowDots();
+  if (lmap) lmap.setView(CITY_CENTERS[currentCity] || [12.9716, 77.5946], CITY_ZOOM[currentCity] || 12);
+  document.getElementById('route-result-panel').innerHTML = '';
+  document.getElementById('routes-row').innerHTML = '';
+}
+
+// ===================== INIT =====================
+function init() {
+  updateClock();
+  setInterval(updateClock, 1000);
+  initCongestion();
+  initParking();
+  buildRouteDropdowns();
+  buildRerouteDropdowns();
+  renderRoadStatus();
+  renderSignals();
+  renderPredCards();
+  renderParkingGrid();
+  renderAnalytics();
+  renderAccidents();
+  renderControlAlerts();
+  renderIncidents();
+  renderMetricsBar();
+  renderAdvisories();
+  renderAlertLog();
+  initFlowDots();
+  setupMapCanvas();
+  startAnim();
+
+  // City select
+  document.getElementById('city-select').addEventListener('change', function(e) {
+    switchCity(e.target.value);
+  });
+
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+      btn.classList.add('active');
+      var tab = btn.dataset.tab;
+      document.getElementById('tab-' + tab).classList.add('active');
+      if (tab === 'map') { setTimeout(resizeMapCanvas, 50); }
+      if (tab === 'analytics') renderAnalytics();
+    });
+  });
+
+  document.getElementById('find-route-btn').addEventListener('click', findRoute);
+  document.getElementById('calc-routes-btn').addEventListener('click', calcRoutes);
+  document.getElementById('export-btn').addEventListener('click', exportData);
+  document.getElementById('copy-url-btn').addEventListener('click', function() {
+    navigator.clipboard.writeText('http://localhost:3001/api/alerts').catch(function() {});
+    this.textContent = 'Copied!';
+    var self = this;
+    setTimeout(function() { self.textContent = 'Copy URL'; }, 2000);
+  });
+
+  // 2-second live update tick
+  setInterval(function() {
+    tickCongestion();
+    renderRoadStatus();
+    renderControlAlerts();
+    renderSignals();
+    renderPredCards();
+    renderIncidents();
+    renderAccidents();
+    renderMetricsBar();
+    drawDensityChart();
+    if (document.getElementById('tab-analytics').classList.contains('active')) renderAnalytics();
+  }, 2000);
+
+  // Parking tick
+  setInterval(function() { tickParking(); renderParkingGrid(); }, 5000);
+
+  // Auto accident generation (simulated — only when not in live mode)
+  setInterval(function() {
+    if (trafficMode !== 'live') autoGenerateAccident();
+  }, 8000);
+
+  // Fetch live incidents every 5 minutes
+  setInterval(fetchLiveIncidents, 300000);
+
+  // Seed initial accidents
+  setTimeout(function() {
+    for (var i = 0; i < 3; i++) autoGenerateAccident();
+    drawDensityChart();
+  }, 600);
+}
+
+window.addEventListener('load', init);
+window.addEventListener('resize', function() {
+  resizeMapCanvas();
+  drawDensityChart();
+  if (document.getElementById('tab-analytics').classList.contains('active')) {
+    drawSpeedDistChart();
+    drawCongHourChart();
+  }
+});
+
+</script>
+</body>
+</html>
